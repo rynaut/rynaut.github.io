@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Boundary Quick Check</title>
+<meta name="description" content="A 5-minute self-check for one AI agent workflow: 10 yes/no questions, one per production boundary. Runs in your browser; nothing is sent anywhere.">
+<style>
+:root{--bg:#0A0E1A;--panel:#121829;--line:#24304d;--text:#E8ECF5;--muted:#9AA6C1;--gold:#F5C842;--teal:#00E5FF;--no:#FF7A6B;--yes:#55D69A;color-scheme:dark}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--no:#B3261E;--yes:#1B7F4E;color-scheme:light}}
+:root[data-theme="light"]{--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--no:#B3261E;--yes:#1B7F4E;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+.kicker{font:600 12px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;color:var(--teal);text-transform:uppercase}
+h1{font-size:clamp(26px,6vw,38px);line-height:1.15;margin:10px 0 8px}
+.lede{color:var(--muted);margin:0 0 20px}
+fieldset{border:1px solid var(--line);background:var(--panel);border-radius:10px;margin:0 0 10px;padding:12px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+legend{float:left;width:100%;padding:0;margin:0 0 8px}
+legend b{font-family:ui-monospace,Consolas,monospace;color:var(--gold);margin-right:6px}
+.opts{display:flex;gap:8px;margin-left:auto}
+.opts label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer;min-height:40px}
+.opts input{accent-color:var(--teal)}
+.opts label:has(input:checked){border-color:var(--teal)}
+.opts label:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:2px}
+#progress{color:var(--muted);margin:16px 0}
+#result{border:2px solid var(--gold);border-radius:12px;padding:16px;margin-top:16px;background:var(--panel)}
+#result[hidden]{display:none}
+#score{font:700 40px/1 ui-monospace,Consolas,monospace;color:var(--gold)}
+#nos li{color:var(--no)}
+.rule{border-left:3px solid var(--no);padding-left:10px;color:var(--muted)}
+a.cta{display:inline-block;margin-top:8px;background:var(--gold);color:#0A0E1A;font-weight:700;text-decoration:none;padding:10px 16px;border-radius:8px}
+button{font:inherit;background:none;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+footer{margin-top:32px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">Rynaut // Free 5-minute check</div>
+  <h1>AI Agent Boundary Quick Check</h1>
+  <p class="lede">Pick one agent workflow. Answer 10 questions, one per production boundary (B01–B10). Your answers stay in this page: nothing is stored or sent.</p>
+
+  <form id="qc" novalidate></form>
+  <p id="progress" aria-live="polite">0 of 10 answered</p>
+
+  <section id="result" hidden aria-live="polite">
+    <div><span id="score">0</span> <span>/ 10</span></div>
+    <p id="band"></p>
+    <div id="nos-wrap">
+      <p><strong>Review before production:</strong></p>
+      <ul id="nos"></ul>
+    </div>
+    <p class="rule">Critical-control rule: whatever the total, any "No" needs review before that workflow goes to production. The score ranks the work; it does not declare a workflow safe. This is a screening tool, not proof of production readiness.</p>
+    <p>Each question is the first of three checks in the full field guide, which adds what the agent may do, what the system must own and the failure when the line is crossed.</p>
+    <a id="guide" class="cta" href="https://rynaut.gumroad.com/l/where-agents-stop">Get the 30-check field guide ($7)</a>
+    <p><button type="button" id="reset">Start again</button></p>
+  </section>
+
+  <footer>RYNAUT · WHERE AGENTS STOP · S01 · Not a certification or audit.</footer>
+</main>
+<script>
+const Q = [
+  ["B01", "Are rate and concurrency limits set by code, never by model output at request time?"],
+  ["B02", "Is there one retry budget per dependency, enforced outside the agent?"],
+  ["B03", "Is every per-keystroke path free of synchronous model calls?"],
+  ["B04", "Is robots.txt checked by code before any agent-chosen fetch?"],
+  ["B05", "Does every session have exactly one lease holder at a time?"],
+  ["B06", "Do breakers trip on local thresholds without waiting for an agent?"],
+  ["B07", "Are tool schemas versioned and validated at call time?"],
+  ["B08", "Does every side-effecting call carry an idempotency key?"],
+  ["B09", "Is there a hold step between recommendation and checkout?"],
+  ["B10", "Is every agent-proposed entry checked for exact balance in code?"]
+];
+const BANDS = [
+  [9, "high", "Model output rarely commits state. Run the full 30 checks to confirm."],
+  [5, "mid", "Some commitments still depend on agent behaviour. Fix the \"no\" rows first."],
+  [0, "low", "Agents currently own production decisions. Review before scaling the workflow."]
+];
+const GUIDE = "https://rynaut.gumroad.com/l/where-agents-stop";
+const form = document.getElementById("qc");
+for (const [id, text] of Q) {
+  const fs = document.createElement("fieldset");
+  fs.dataset.id = id;
+  const lg = document.createElement("legend");
+  const b = document.createElement("b"); b.textContent = id;
+  lg.append(b, document.createTextNode(text));
+  const opts = document.createElement("div"); opts.className = "opts";
+  for (const v of ["yes", "no"]) {
+    const l = document.createElement("label");
+    const i = document.createElement("input");
+    i.type = "radio"; i.name = id; i.value = v;
+    l.append(i, document.createTextNode(v === "yes" ? "Yes" : "No"));
+    opts.append(l);
+  }
+  fs.append(lg, opts);
+  form.append(fs);
+}
+function update() {
+  const answers = Q.map(([id]) => (form.querySelector(`input[name="${id}"]:checked`) || {}).value);
+  const done = answers.filter(Boolean).length;
+  document.getElementById("progress").textContent = `${done} of 10 answered`;
+  const res = document.getElementById("result");
+  if (done < 10) { res.hidden = true; return; }
+  const score = answers.filter(a => a === "yes").length;
+  const [, key, text] = BANDS.find(([min]) => score >= min);
+  document.getElementById("score").textContent = score;
+  const band = document.getElementById("band");
+  band.textContent = text; band.dataset.band = key;
+  const nos = Q.filter((_, i) => answers[i] === "no");
+  const ul = document.getElementById("nos"); ul.replaceChildren();
+  for (const [id, t] of nos) { const li = document.createElement("li"); li.textContent = `${id} — ${t}`; ul.append(li); }
+  document.getElementById("nos-wrap").hidden = nos.length === 0;
+  const u = new URL(GUIDE);
+  u.search = new URLSearchParams({utm_source: "quickcheck-web", utm_medium: "web", utm_campaign: "wtag-s01",
+                                  utm_content: `score-${key}`}).toString();
+  document.getElementById("guide").href = u.toString();
+  res.hidden = false;
+}
+form.addEventListener("change", update);
+document.getElementById("reset").addEventListener("click", () => { form.reset(); update(); window.scrollTo(0, 0); });
+update();
+</script>
+</body>
+</html>
