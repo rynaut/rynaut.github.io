@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU Memory Calculator</title>
+<meta name="description" content="Where your GPU memory goes: weights, KV cache, gradients, optimizer states and activations for LLM inference and training. Runs in your browser; nothing is sent anywhere.">
+<style>
+:root{--bg:#0A0E1A;--panel:#121829;--line:#24304d;--text:#E8ECF5;--muted:#9AA6C1;--gold:#F5C842;--teal:#00E5FF;--bad:#FF7A6B;--ok:#55D69A;
+--c1:#00E5FF;--c2:#F5C842;--c3:#B48CFF;--c4:#FF9F5A;--c5:#55D69A;--c6:#9AA6C1;color-scheme:dark}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--bad:#B3261E;--ok:#1B7F4E;
+--c1:#007C8C;--c2:#9A7400;--c3:#6B44C9;--c4:#B85A12;--c5:#1B7F4E;--c6:#55607A;color-scheme:light}}
+:root[data-theme="light"]{--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--bad:#B3261E;--ok:#1B7F4E;
+--c1:#007C8C;--c2:#9A7400;--c3:#6B44C9;--c4:#B85A12;--c5:#1B7F4E;--c6:#55607A;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:24px 16px 48px}
+.kicker{font:600 12px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;color:var(--teal);text-transform:uppercase}
+h1{font-size:clamp(26px,6vw,38px);line-height:1.15;margin:10px 0 8px}
+h2{font-size:18px;margin:0 0 10px}
+.lede{color:var(--muted);margin:0 0 18px}
+.tabs{display:flex;gap:8px;margin:0 0 14px}
+.tabs button{flex:1}
+.tabs button[aria-selected="true"]{border-color:var(--teal);color:var(--teal);font-weight:700}
+.panel{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{font:15px/1.2 ui-monospace,Consolas,monospace;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:40px;width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+button{font:inherit;background:none;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:40px}
+.total{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#total{font:700 clamp(32px,8vw,44px)/1 ui-monospace,Consolas,monospace;color:var(--gold)}
+#verdict{font-weight:700}
+#verdict.ok{color:var(--ok)}#verdict.bad{color:var(--bad)}
+.bar{display:flex;height:22px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin:12px 0 4px;background:var(--bg);position:relative}
+.bar span{display:block;height:100%}
+.cap{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--text)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+td{padding:6px 4px;border-top:1px solid var(--line)}
+td.n{text-align:right;font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:middle}
+.formula{font:13px/1.5 ui-monospace,Consolas,monospace;color:var(--muted);overflow-wrap:anywhere}
+.note{color:var(--muted);font-size:13px}
+.cta{border:2px solid var(--gold)}
+a.btn{display:inline-block;margin:6px 8px 0 0;background:var(--gold);color:#0A0E1A;font-weight:700;text-decoration:none;padding:10px 16px;border-radius:8px}
+a.ghost{background:none;color:var(--text);border:1px solid var(--line)}
+[hidden]{display:none!important}
+footer{margin-top:28px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:12px}
+footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">Rynaut // Where the token actually goes</div>
+  <h1>Where does my GPU memory go?</h1>
+  <p class="lede">Estimate the memory an LLM needs on one GPU, part by part, before you hit out-of-memory. Everything is calculated in this page: nothing is stored or sent.</p>
+
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-infer" aria-selected="true" data-mode="infer">Inference (serving)</button>
+    <button type="button" role="tab" id="tab-train" aria-selected="false" data-mode="train">Training / fine-tuning</button>
+  </div>
+
+  <section class="panel" aria-live="polite">
+    <div class="total"><span id="total">0</span><span>GiB needed</span><span id="verdict"></span></div>
+    <div class="bar" id="bar" aria-hidden="true"></div>
+    <p class="note" id="barnote"></p>
+    <table id="rows"></table>
+  </section>
+
+  <form id="f" class="panel" novalidate>
+    <h2>Model</h2>
+    <div class="grid">
+      <label>Preset
+        <select id="preset"></select>
+      </label>
+      <label>Parameters (billions)<input id="params" type="number" min="0.01" step="0.01"></label>
+      <label>Layers (L)<input id="layers" type="number" min="1" step="1"></label>
+      <label>Hidden size (h)<input id="hidden" type="number" min="1" step="1"></label>
+      <label>Attention heads (a)<input id="heads" type="number" min="1" step="1"></label>
+      <label>KV heads (H_kv)<input id="kvheads" type="number" min="1" step="1"></label>
+      <label>Head dim (d_h)<input id="headdim" type="number" min="1" step="1"></label>
+      <label>Vocabulary size (V)<input id="vocab" type="number" min="1" step="1"></label>
+    </div>
+    <p class="note">Presets are read from each model's published config. Check your model's <code>config.json</code> if you use a variant.</p>
+
+    <h2 style="margin-top:14px">Workload</h2>
+    <div class="grid">
+      <label>GPU memory (GiB)<input id="vram" type="number" min="1" step="1" list="vrams"></label>
+      <label data-only="infer">Weight precision
+        <select id="wprec"><option value="2">16-bit (FP16/BF16)</option><option value="1">8-bit (FP8/INT8)</option><option value="0.5">4-bit (INT4)</option><option value="4">32-bit (FP32)</option></select>
+      </label>
+      <label data-only="infer">KV cache precision
+        <select id="kvprec"><option value="2">16-bit</option><option value="1">8-bit</option></select>
+      </label>
+      <label data-only="infer">Concurrent sequences (b)<input id="batch" type="number" min="1" step="1"></label>
+      <label data-only="infer">Tokens per sequence (T, prompt + output)<input id="tokens" type="number" min="1" step="1"></label>
+      <label data-only="infer">Max context reserved (contiguous)<input id="maxctx" type="number" min="1" step="1"></label>
+      <label data-only="infer">Paged block size (tokens)<input id="block" type="number" min="1" step="1"></label>
+      <label data-only="train">Optimizer and precision
+        <select id="opt">
+          <option value="16">Mixed precision + Adam (16 B/param)</option>
+          <option value="10">Mixed precision + 8-bit Adam (10 B/param)</option>
+          <option value="12">Mixed precision + SGD momentum (12 B/param)</option>
+        </select>
+      </label>
+      <label data-only="train">Micro-batch size (b)<input id="tbatch" type="number" min="1" step="1"></label>
+      <label data-only="train">Sequence length (s)<input id="seq" type="number" min="1" step="1"></label>
+      <label data-only="train">Activation recomputation
+        <select id="recomp"><option value="none">None</option><option value="selective">Selective (attention)</option><option value="full">Full (checkpoint each layer)</option></select>
+      </label>
+      <label>Runtime overhead (GiB, your measurement)<input id="overhead" type="number" min="0" step="0.1"></label>
+    </div>
+    <datalist id="vrams"><option value="6"><option value="8"><option value="12"><option value="16"><option value="24"><option value="40"><option value="48"><option value="80"></datalist>
+    <p class="note">Runtime overhead (framework, kernels, fragmentation) depends on your stack. Measure it with <code>nvidia-smi</code> on an idle loaded model; 0 leaves it out.</p>
+  </form>
+
+
+  <section class="panel" id="paging" data-only="infer">
+    <h2>Why the KV cache can still run out: reserved vs paged</h2>
+    <table id="prows"></table>
+    <p class="note">A contiguous allocator reserves the maximum context for every sequence up front. A paged allocator (PagedAttention, Kwon et al., SOSP 2023) hands out fixed-size blocks on demand, so the most a sequence can waste is its last, partly filled block. That paper measured only 20.4–38.2% of KV-cache memory holding real token states in the earlier systems it evaluated; your numbers above are this workload, not that benchmark.</p>
+  </section>
+
+  <section class="panel">
+    <h2>How it's calculated</h2>
+    <p class="formula" data-only="infer">weights = params × bytes(weight precision)<br>KV cache = 2 · L · T · H_kv · d_h · bytes(KV) · b &nbsp;(the 2 is one K and one V per token per layer)</p>
+    <p class="formula" data-only="train">weights + gradients + optimizer = params × bytes/param (16 for mixed-precision Adam: 2 weights + 2 gradients + 4 FP32 master copy + 8 Adam moments; Rajbhandari et al., ZeRO, 2020)<br>activations per layer (16-bit) = s · b · h · (34 + 5 · a · s / h); selective = 34 · s · b · h; full = 2 · s · b · h (Korthikanti et al., 2022)<br>logits = s · b · V · 4 bytes (FP32)</p>
+    <p class="note">Estimates for one GPU, no tensor or pipeline parallelism. Real frameworks add temporary buffers, so leave headroom. 1 GiB = 1,073,741,824 bytes.</p>
+  </section>
+
+  <section class="panel cta">
+    <h2>Watch where the memory goes</h2>
+    <p>Season 02 of <b>Where the Token Actually Goes</b> walks one request through the KV cache, the allocator and the bill, with every figure sourced.</p>
+    <a class="btn" id="cta-sub" href="https://rynaut.substack.com/subscribe?utm_source=kv_calculator">Get the next episode by email</a>
+    <a class="btn ghost" id="cta-yt" href="https://www.youtube.com/@ArchitectingAutomation?sub_confirmation=1">Subscribe on YouTube</a>
+    <p class="note" style="margin-top:10px"><button type="button" id="share">Copy link to these numbers</button> <span id="copied" role="status"></span></p>
+  </section>
+
+  <footer>RYNAUT · <a href="../">More free tools</a> · <a href="../quick-check/">AI Agent Boundary Quick Check</a> · Vendor-neutral estimate, not a guarantee.</footer>
+</main>
+<script>
+"use strict";
+const PRESETS = {
+  "llama3-8b":  {name:"Llama 3.1 8B",   params:8.03,  layers:32, hidden:4096, heads:32, kvheads:8,  headdim:128, vocab:128256},
+  "mistral-7b": {name:"Mistral 7B",     params:7.24,  layers:32, hidden:4096, heads:32, kvheads:8,  headdim:128, vocab:32000},
+  "qwen25-7b":  {name:"Qwen2.5 7B",     params:7.62,  layers:28, hidden:3584, heads:28, kvheads:4,  headdim:128, vocab:152064},
+  "qwen25-14b": {name:"Qwen2.5 14B",    params:14.7,  layers:48, hidden:5120, heads:40, kvheads:8,  headdim:128, vocab:152064},
+  "phi3-mini":  {name:"Phi-3 mini 3.8B (no GQA)", params:3.82, layers:32, hidden:3072, heads:32, kvheads:32, headdim:96, vocab:32064},
+  "llama3-70b": {name:"Llama 3.1 70B",  params:70.6,  layers:80, hidden:8192, heads:64, kvheads:8,  headdim:128, vocab:128256},
+  "custom":     {name:"Custom"}
+};
+const DEFAULTS = {mode:"infer", preset:"llama3-8b", vram:24, wprec:"2", kvprec:"2", batch:16, tokens:4096, maxctx:8192, block:16,
+  opt:"16", tbatch:1, seq:2048, recomp:"none", overhead:0};
+const MODEL_KEYS = ["params","layers","hidden","heads","kvheads","headdim","vocab"];
+const NUM_KEYS = [...MODEL_KEYS,"vram","batch","tokens","maxctx","block","tbatch","seq","overhead"];
+const SEL_KEYS = ["wprec","kvprec","opt","recomp"];
+const GiB = 1024 ** 3;
+const $ = id => document.getElementById(id);
+let mode = "infer";
+
+const sel = $("preset");
+for (const [k, p] of Object.entries(PRESETS)) sel.add(new Option(p.name, k));
+
+function applyPreset(k) {
+  const p = PRESETS[k]; if (!p || k === "custom") return;
+  for (const key of MODEL_KEYS) $(key).value = p[key];
+}
+function num(id) { const v = parseFloat($(id).value); return Number.isFinite(v) && v >= 0 ? v : 0; }
+function fmt(bytes) { const g = bytes / GiB; return g >= 100 ? g.toFixed(0) : g >= 10 ? g.toFixed(1) : g.toFixed(2); }
+
+function compute() {
+  const P = num("params") * 1e9, L = num("layers"), h = num("hidden"), a = num("heads"),
+        hkv = num("kvheads"), dh = num("headdim"), V = num("vocab"), over = num("overhead") * GiB;
+  const parts = [];
+  if (mode === "infer") {
+    const wb = parseFloat($("wprec").value), kb = parseFloat($("kvprec").value),
+          b = num("batch"), T = num("tokens"), maxc = num("maxctx"), blk = Math.max(1, num("block"));
+    const perTok = 2 * L * hkv * dh * kb;
+    parts.push({k:"weights", label:"Model weights", bytes:P * wb, c:"--c1"});
+    parts.push({k:"kv", label:`KV cache (${b} × ${T.toLocaleString("en-US")} tokens)`, bytes:perTok * T * b, c:"--c2"});
+    if (over) parts.push({k:"overhead", label:"Runtime overhead (yours)", bytes:over, c:"--c6"});
+    const reserved = perTok * Math.max(maxc, T) * b, paged = perTok * Math.ceil(T / blk) * blk * b, used = perTok * T * b;
+    $("prows").innerHTML =
+      row("KV per token", perTok, null, `${(perTok/1024).toFixed(0)} KiB`) +
+      row(`Contiguous: reserve ${Math.max(maxc,T).toLocaleString("en-US")} tokens × ${b}`, reserved, used) +
+      row(`Paged: ${blk}-token blocks on demand`, paged, used);
+  } else {
+    const bpp = parseFloat($("opt").value), b = num("tbatch"), s = num("seq"), rc = $("recomp").value;
+    const w = P * 2, g = P * 2, o = P * (bpp - 4);
+    let act = rc === "full" ? 2 * s * b * h * L : rc === "selective" ? 34 * s * b * h * L : s * b * h * (34 + 5 * a * s / Math.max(h,1)) * L;
+    parts.push({k:"weights", label:"Weights (16-bit)", bytes:w, c:"--c1"});
+    parts.push({k:"grads", label:"Gradients (16-bit)", bytes:g, c:"--c3"});
+    parts.push({k:"optim", label:"Optimizer states + FP32 master copy", bytes:o, c:"--c4"});
+    parts.push({k:"act", label:`Activations (${rc === "none" ? "no" : rc} recomputation)`, bytes:act, c:"--c2"});
+    parts.push({k:"logits", label:`Logits (FP32, vocab ${V.toLocaleString("en-US")})`, bytes:s * b * V * 4, c:"--c5"});
+    if (over) parts.push({k:"overhead", label:"Runtime overhead (yours)", bytes:over, c:"--c6"});
+  }
+  const total = parts.reduce((t, p) => t + p.bytes, 0), cap = num("vram") * GiB;
+  $("total").textContent = fmt(total);
+  const v = $("verdict");
+  if (cap > 0) {
+    const fits = total <= cap;
+    v.className = fits ? "ok" : "bad";
+    v.textContent = fits ? `fits in ${num("vram")} GiB (${fmt(cap - total)} GiB left)` : `does not fit in ${num("vram")} GiB (${fmt(total - cap)} GiB over)`;
+  } else { v.className = ""; v.textContent = ""; }
+  const scale = Math.max(total, cap) || 1;
+  $("bar").innerHTML = parts.map(p => `<span title="${p.label}" style="width:${(p.bytes/scale*100).toFixed(3)}%;background:var(${p.c})"></span>`).join("") +
+    (cap > 0 ? `<i class="cap" style="left:calc(${(cap/scale*100).toFixed(3)}% - 1px)"></i>` : "");
+  $("barnote").textContent = cap > 0 ? "The vertical line is your GPU memory." : "";
+  $("rows").innerHTML = parts.map(p => `<tr data-k="${p.k}"><td><span class="sw" style="background:var(${p.c})"></span>${p.label}</td><td class="n">${fmt(p.bytes)} GiB</td><td class="n">${total ? (p.bytes/total*100).toFixed(0) : 0}%</td></tr>`).join("");
+  writeUrl();
+  return {total: total / GiB, parts: Object.fromEntries(parts.map(p => [p.k, p.bytes / GiB]))};
+}
+function row(label, bytes, used, text) {
+  const waste = used != null && bytes > 0 ? ` <span class="note">(${((bytes - used) / bytes * 100).toFixed(1)}% unused)</span>` : "";
+  return `<tr><td>${label}</td><td class="n">${text || fmt(bytes) + " GiB"}${waste}</td></tr>`;
+}
+function setMode(m) {
+  mode = m === "train" ? "train" : "infer";
+  document.querySelectorAll("[role=tab]").forEach(t => t.setAttribute("aria-selected", String(t.dataset.mode === mode)));
+  document.querySelectorAll("[data-only]").forEach(el => el.hidden = el.dataset.only !== mode);
+}
+function writeUrl() {
+  const q = new URLSearchParams({mode, preset: sel.value});
+  for (const k of [...NUM_KEYS, ...SEL_KEYS]) if (sel.value !== "custom" && MODEL_KEYS.includes(k)) continue; else q.set(k, $(k).value);
+  history.replaceState(null, "", "?" + q.toString());
+}
+function readUrl() {
+  const q = new URLSearchParams(location.search);
+  const preset = PRESETS[q.get("preset")] ? q.get("preset") : DEFAULTS.preset;
+  sel.value = preset; applyPreset(preset);
+  for (const k of [...NUM_KEYS, ...SEL_KEYS]) {
+    if (MODEL_KEYS.includes(k) && preset !== "custom") continue;
+    const v = q.get(k);
+    if (v !== null && v !== "") $(k).value = v; else if (k in DEFAULTS) $(k).value = DEFAULTS[k];
+  }
+  setMode(q.get("mode") || DEFAULTS.mode);
+}
+sel.addEventListener("change", () => { applyPreset(sel.value); compute(); });
+$("f").addEventListener("input", e => {
+  if (MODEL_KEYS.includes(e.target.id) && sel.value !== "custom") sel.value = "custom";
+  compute();
+});
+document.querySelectorAll("[role=tab]").forEach(t => t.addEventListener("click", () => { setMode(t.dataset.mode); compute(); }));
+$("share").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(location.href); $("copied").textContent = "Copied."; }
+  catch (e) { $("copied").textContent = location.href; }
+});
+readUrl();
+window.kvCalc = {compute, setMode};
+compute();
+</script>
+</body>
+</html>
