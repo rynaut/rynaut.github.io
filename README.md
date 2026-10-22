@@ -1,7 +1,15 @@
 # rynaut.github.io
 
-Free, browser-only tools from Rynaut (@ArchitectingAutomation).
+Free, browser-only tools from Rynaut ([@ArchitectingAutomation](https://www.youtube.com/@ArchitectingAutomation)). Nothing you type leaves your browser.
 
-- `/quick-check/` - AI Agent Boundary Quick Check (10 questions, no data leaves the browser).
+| Tool | What it does |
+|---|---|
+| [`/kv/`](https://rynaut.github.io/kv/) | **Where does my GPU memory go?** Weights, KV cache (reserved vs paged), gradients, optimizer states, activations and logits for LLM inference and training. |
+| [`/quick-check/`](https://rynaut.github.io/quick-check/) | **AI Agent Boundary Quick Check.** 10 yes/no questions, one per production boundary. |
 
-Source of the Quick Check and its Playwright tests: Rynaut_Artifacts/quick-check-web (local).
+## Use it, fork it
+Licensed under [Apache-2.0](LICENSE). Use the tools, fork them, adapt the formulas for your own stack. Each page is a single HTML file with no build step and no dependencies. Every formula and its source is shown on the page.
+
+Found a wrong number or want a model preset added? Open an issue with the source (the model's `config.json` or the paper).
+
+Estimates, not guarantees. Not a certification or audit.
