@@ -5,6 +5,7 @@ Free, browser-only tools from Rynaut ([@ArchitectingAutomation](https://www.yout
 | Tool | What it does |
 |---|---|
 | [`/kv/`](https://rynaut.github.io/kv/) | **Where does my GPU memory go?** Weights, KV cache (reserved vs paged), gradients, optimizer states, activations and logits for LLM inference and training. |
+| [`/tokens/`](https://rynaut.github.io/tokens/) | **What will my LLM bill be, and what cuts it?** Monthly bill and the saving from each lever: retries, context trimming, prompt caching, model routing. |
 | [`/quick-check/`](https://rynaut.github.io/quick-check/) | **AI Agent Boundary Quick Check.** 10 yes/no questions, one per production boundary. |
 
 ## Use it, fork it

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Token Bill Estimator</title>
+<meta name="description" content="Estimate your monthly LLM API bill and what each lever saves: fewer retries, trimmed context, prompt caching and routing to a smaller model. Runs in your browser; nothing is sent anywhere.">
+<style>
+:root{--bg:#0A0E1A;--panel:#121829;--line:#24304d;--text:#E8ECF5;--muted:#9AA6C1;--gold:#F5C842;--teal:#00E5FF;--bad:#FF7A6B;--ok:#55D69A;
+--c1:#00E5FF;--c2:#F5C842;--c3:#B48CFF;--c4:#FF9F5A;--c5:#55D69A;--c6:#9AA6C1;color-scheme:dark}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--bad:#B3261E;--ok:#1B7F4E;
+--c1:#007C8C;--c2:#9A7400;--c3:#6B44C9;--c4:#B85A12;--c5:#1B7F4E;--c6:#55607A;color-scheme:light}}
+:root[data-theme="light"]{--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--bad:#B3261E;--ok:#1B7F4E;
+--c1:#007C8C;--c2:#9A7400;--c3:#6B44C9;--c4:#B85A12;--c5:#1B7F4E;--c6:#55607A;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:24px 16px 48px}
+.kicker{font:600 12px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;color:var(--teal);text-transform:uppercase}
+h1{font-size:clamp(26px,6vw,38px);line-height:1.15;margin:10px 0 8px}
+h2{font-size:18px;margin:0 0 10px}
+.lede{color:var(--muted);margin:0 0 18px}
+.tabs{display:flex;gap:8px;margin:0 0 14px}
+.tabs button{flex:1}
+.tabs button[aria-selected="true"]{border-color:var(--teal);color:var(--teal);font-weight:700}
+.panel{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{font:15px/1.2 ui-monospace,Consolas,monospace;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:40px;width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+button{font:inherit;background:none;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:40px}
+.total{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#total{font:700 clamp(32px,8vw,44px)/1 ui-monospace,Consolas,monospace;color:var(--gold)}
+#verdict{font-weight:700}
+#verdict.ok{color:var(--ok)}#verdict.bad{color:var(--bad)}
+.bar{display:flex;height:22px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin:12px 0 4px;background:var(--bg);position:relative}
+.bar span{display:block;height:100%}
+.cap{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--text)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+td{padding:6px 4px;border-top:1px solid var(--line)}
+td.n{text-align:right;font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:middle}
+.formula{font:13px/1.5 ui-monospace,Consolas,monospace;color:var(--muted);overflow-wrap:anywhere}
+.note{color:var(--muted);font-size:13px}
+.cta{border:2px solid var(--gold)}
+a.btn{display:inline-block;margin:6px 8px 0 0;background:var(--gold);color:#0A0E1A;font-weight:700;text-decoration:none;padding:10px 16px;border-radius:8px}
+a.ghost{background:none;color:var(--text);border:1px solid var(--line)}
+[hidden]{display:none!important}
+footer{margin-top:28px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:12px}
+footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">Rynaut // Where the token actually goes</div>
+  <h1>What will my LLM bill be, and what cuts it?</h1>
+  <p class="lede">Enter your traffic and your provider's prices. See the monthly bill now, and how much each lever saves: fewer retries, a shorter context, prompt caching, a smaller model for easy requests. Everything is calculated in this page: nothing is stored or sent.</p>
+
+  <section class="panel" aria-live="polite">
+    <div class="total"><span id="total">0</span><span>per month now</span><span id="verdict" class="ok"></span></div>
+    <table id="steps"></table>
+    <p class="note">Levers are applied in the order shown; each saving is measured after the ones above it, so the parts add up to the total.</p>
+  </section>
+
+  <form id="f" class="panel" novalidate>
+    <h2>Traffic</h2>
+    <div class="grid">
+      <label>Requests per day<input id="req" type="number" min="0" step="1"></label>
+      <label>Input tokens per request (prompt + context)<input id="tin" type="number" min="0" step="1"></label>
+      <label>Output tokens per request<input id="tout" type="number" min="0" step="1"></label>
+      <label>Days per month<input id="days" type="number" min="1" step="1"></label>
+    </div>
+
+    <h2 style="margin-top:14px">Prices (per 1M tokens, your provider's)</h2>
+    <div class="grid">
+      <label>Main model: input ($)<input id="pin" type="number" min="0" step="0.01"></label>
+      <label>Main model: output ($)<input id="pout" type="number" min="0" step="0.01"></label>
+      <label>Small model: input ($)<input id="sin" type="number" min="0" step="0.01"></label>
+      <label>Small model: output ($)<input id="sout" type="number" min="0" step="0.01"></label>
+      <label>Cached input price (× input price)<input id="cmul" type="number" min="0" max="1" step="0.01"></label>
+    </div>
+    <p class="note">The prices filled in are examples so the page works at once, not a quote from any provider. Replace them with your own price sheet. Some providers also charge extra to write the cache; that isn't modelled.</p>
+
+    <h2 style="margin-top:14px">Levers: now → target</h2>
+    <div class="grid">
+      <label>Retries and loops now (% extra calls)<input id="r0" type="number" min="0" step="1"></label>
+      <label>Retries and loops target (%)<input id="r1" type="number" min="0" step="1"></label>
+      <label>Context trimmed now (% of input)<input id="t0" type="number" min="0" max="100" step="1"></label>
+      <label>Context trimmed target (%)<input id="t1" type="number" min="0" max="100" step="1"></label>
+      <label>Input served from cache now (%)<input id="h0" type="number" min="0" max="100" step="1"></label>
+      <label>Input served from cache target (%)<input id="h1" type="number" min="0" max="100" step="1"></label>
+      <label>Requests on small model now (%)<input id="s0" type="number" min="0" max="100" step="1"></label>
+      <label>Requests on small model target (%)<input id="s1" type="number" min="0" max="100" step="1"></label>
+    </div>
+    <p class="note">Set targets you can defend: measure your cache hit rate and retry rate in your logs, and route to a small model only the request types it passes your evaluation on.</p>
+  </form>
+
+  <section class="panel">
+    <h2>How it's calculated</h2>
+    <p class="formula">calls = requests/day × days × (1 + retries)<br>input billed = input tokens × (1 − trimmed)<br>cost per call = input billed × ((1 − cached) × price_in + cached × price_in × cached multiplier) + output × price_out<br>bill = calls × ((1 − small share) × cost on main + small share × cost on small) ÷ 1,000,000</p>
+    <p class="note">One request type with average token counts. Output tokens and retries are assumed to stay the same per call when you trim or route. Estimate, not a quote.</p>
+  </section>
+
+  <section class="panel cta">
+    <h2>Find where your tokens leak</h2>
+    <p>The free <b>Headroom Integration Audit</b> walks your stack for the places token and memory cost leaks before it reaches the bill. Season 02 of <b>Where the Token Actually Goes</b> shows each lever on a real request.</p>
+    <a class="btn" id="cta-audit" href="https://rynaut.gumroad.com/l/headroom-audit?utm_source=token_estimator">Get the free audit</a>
+    <a class="btn ghost" id="cta-sub" href="https://rynaut.substack.com/subscribe?utm_source=token_estimator">Get the next episode by email</a>
+    <p class="note" style="margin-top:10px"><button type="button" id="share">Copy link to these numbers</button> <span id="copied" role="status"></span></p>
+  </section>
+
+  <footer>RYNAUT · <a href="../">More free tools</a> · <a href="../kv/">GPU Memory Calculator</a> · Vendor-neutral estimate, not a quote.</footer>
+</main>
+<script>
+"use strict";
+const DEFAULTS = {req:10000, tin:3000, tout:500, days:30, pin:3, pout:15, sin:0.25, sout:1.25, cmul:0.1,
+  r0:10, r1:2, t0:0, t1:20, h0:0, h1:50, s0:0, s1:30};
+const KEYS = Object.keys(DEFAULTS);
+const $ = id => document.getElementById(id);
+const v = id => { const x = parseFloat($(id).value); return Number.isFinite(x) && x >= 0 ? x : 0; };
+const pct = id => Math.min(v(id), 100) / 100;
+const money = x => "$" + (x >= 100 ? Math.round(x).toLocaleString("en-US") : x.toFixed(2));
+
+function bill(c) {
+  const calls = v("req") * v("days") * (1 + c.retry);
+  const tin = v("tin") * (1 - c.trim), tout = v("tout"), m = Math.min(v("cmul"), 1);
+  const perCall = (pi, po) => tin * ((1 - c.hit) * pi + c.hit * pi * m) + tout * po;
+  return calls * ((1 - c.small) * perCall(v("pin"), v("pout")) + c.small * perCall(v("sin"), v("sout"))) / 1e6;
+}
+function compute() {
+  const now = {retry: v("r0") / 100, trim: pct("t0"), hit: pct("h0"), small: pct("s0")};
+  const steps = [
+    {k:"retry", label:"Cut retries and loops", key:"retry", to:v("r1") / 100},
+    {k:"trim", label:"Trim the context", key:"trim", to:pct("t1")},
+    {k:"cache", label:"Serve the prefix from cache", key:"hit", to:pct("h1")},
+    {k:"route", label:"Route easy requests to the small model", key:"small", to:pct("s1")},
+  ];
+  const base = bill(now);
+  let cur = {...now}, prev = base;
+  const out = {now: base, steps: {}};
+  let rows = `<tr><td>Bill now</td><td class="n">${money(base)}</td><td class="n"></td></tr>`;
+  for (const s of steps) {
+    cur = {...cur, [s.key]: s.to};
+    const b = bill(cur), save = prev - b;
+    out.steps[s.k] = save;
+    rows += `<tr data-k="${s.k}"><td>${s.label}</td><td class="n">${save >= 0 ? "−" : "+"}${money(Math.abs(save))}</td><td class="n">${base ? (save / base * 100).toFixed(0) : 0}%</td></tr>`;
+    prev = b;
+  }
+  out.target = prev;
+  rows += `<tr><td><b>Bill at target</b></td><td class="n"><b>${money(prev)}</b></td><td class="n"><b>${base ? ((base - prev) / base * 100).toFixed(0) : 0}% less</b></td></tr>`;
+  $("steps").innerHTML = rows;
+  $("total").textContent = money(base);
+  const saved = base - prev;
+  $("verdict").textContent = saved > 0 ? `${money(saved)}/month less at target (${money(saved * 12)}/year)` : "";
+  writeUrl();
+  return out;
+}
+function writeUrl() {
+  const q = new URLSearchParams();
+  for (const k of KEYS) q.set(k, $(k).value);
+  history.replaceState(null, "", "?" + q.toString());
+}
+function readUrl() {
+  const q = new URLSearchParams(location.search);
+  for (const k of KEYS) { const x = q.get(k); $(k).value = x !== null && x !== "" ? x : DEFAULTS[k]; }
+}
+$("f").addEventListener("input", compute);
+$("share").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(location.href); $("copied").textContent = "Copied."; }
+  catch (e) { $("copied").textContent = location.href; }
+});
+readUrl();
+window.tokenCalc = {compute, bill};
+compute();
+</script>
+</body>
+</html>
