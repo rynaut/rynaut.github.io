@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP Server Least-Privilege Check</title>
+<meta name="description" content="10 yes/no checks for an MCP server that AI agents call, against the 2026-07-28 MCP specification: metadata, client registration, audience, token passthrough, headers, _meta, scopes, critical actions and MRTR approvals, caching, audit. Runs in your browser.">
+<style>
+:root{--bg:#0A0E1A;--panel:#111729;--raise:#161E35;--line:#26324f;--text:#E8ECF5;--muted:#97A3BF;--gold:#F5C842;--teal:#00E5FF;--no:#FF7A6B;--trace:#070A13;color-scheme:dark}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#F4F6FA;--panel:#FFFFFF;--raise:#EEF2F8;--line:#D5DCE8;--text:#0E1424;--muted:#55607A;--gold:#8A6800;--teal:#007C8C;--no:#B3261E;--trace:#0E1424;color-scheme:light}}
+:root[data-theme="light"]{--bg:#F4F6FA;--panel:#FFFFFF;--raise:#EEF2F8;--line:#D5DCE8;--text:#0E1424;--muted:#55607A;--gold:#8A6800;--teal:#007C8C;--no:#B3261E;--trace:#0E1424;color-scheme:light}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--teal)}
+.wrap{max-width:1160px;margin:0 auto;padding:28px 20px 56px}
+header{max-width:760px;margin-bottom:22px}
+.brand{font-weight:700;color:var(--gold);letter-spacing:.02em;font-size:15px}
+h1{font-size:clamp(28px,4.6vw,44px);line-height:1.08;letter-spacing:-.02em;margin:8px 0 12px}
+.lede{color:var(--muted);margin:0;font-size:17px;max-width:68ch}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:14px;color:var(--muted)}
+.chip{font:600 12px/1 ui-monospace,Consolas,monospace;border:1px solid currentColor;border-radius:5px;padding:4px 6px;margin-right:6px}
+.chip.spec{color:var(--teal)}.chip.prac{color:var(--gold)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:28px;align-items:start}
+@media (max-width:920px){.grid{grid-template-columns:1fr}}
+.transport{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:18px}
+.transport span{font-weight:600;margin-right:4px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg label{padding:8px 14px;cursor:pointer;min-height:40px;display:flex;align-items:center}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--teal);color:#06121a;font-weight:700}
+.seg label:has(input:focus-visible){outline:2px solid var(--gold);outline-offset:-2px}
+.note{font-size:14px;color:var(--muted);flex-basis:100%;margin:2px 0 0}
+.stage{margin:0 0 22px}
+.stage h2{font-size:15px;color:var(--muted);font-weight:600;margin:0 0 8px;display:flex;gap:10px;align-items:baseline}
+.stage h2 b{color:var(--text);font-size:19px;letter-spacing:-.01em}
+.q{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:8px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center}
+.q[data-a="yes"]{border-left-color:var(--teal)}.q[data-a="no"]{border-left-color:var(--no)}
+.q.na{opacity:.4}
+.q p{margin:0}.q .t{font-weight:600}
+.q .s{grid-column:1/-1;font-size:14px;color:var(--muted)}
+@media (max-width:560px){.q{grid-template-columns:1fr}}
+.yn{display:inline-flex;gap:6px}
+.yn label{border:1px solid var(--line);border-radius:8px;padding:7px 14px;cursor:pointer;min-height:40px;min-width:62px;display:flex;align-items:center;justify-content:center;font-weight:600}
+.yn input{position:absolute;opacity:0;pointer-events:none}
+.yn label:has(input[value=yes]:checked){background:var(--teal);border-color:var(--teal);color:#06121a}
+.yn label:has(input[value=no]:checked){background:var(--no);border-color:var(--no);color:#1a0705}
+.yn label:has(input:focus-visible){outline:2px solid var(--gold);outline-offset:2px}
+.yn input:disabled+span{opacity:.5}
+aside{position:sticky;top:16px}
+@media (max-width:920px){aside{position:static;order:-1}}
+.trace{background:var(--trace);color:#D9E2F2;border-radius:14px;padding:16px 0 10px;font:13px/1.65 ui-monospace,Consolas,monospace;border:1px solid #1d2742;overflow:hidden}
+.trace .cap{padding:0 16px 10px;color:#8E9BB8;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;border-bottom:1px solid #1d2742;margin-bottom:8px}
+.ln{display:grid;grid-template-columns:22px minmax(0,1fr);padding:0 16px 0 10px;transition:background .25s}
+.ln .d{width:8px;height:8px;border-radius:50%;background:#33405f;margin-top:8px}
+.ln code{white-space:pre-wrap;overflow-wrap:anywhere;color:#8E9BB8}
+.ln.sep code{color:#56627e}
+.ln[data-a="yes"] .d{background:#00E5FF}.ln[data-a="yes"] code{color:#D9F7FF}
+.ln[data-a="no"] .d{background:#FF7A6B}.ln[data-a="no"] code{color:#FFB3A9;text-decoration:line-through;text-decoration-color:rgba(255,122,107,.5)}
+.ln[data-a="na"]{opacity:.35}
+.ln.hit{background:rgba(0,229,255,.08)}
+.meter{display:flex;gap:4px;padding:10px 16px 4px}
+.meter i{flex:1;height:6px;border-radius:3px;background:#26324f}
+.meter i[data-a="yes"]{background:#00E5FF}.meter i[data-a="no"]{background:#FF7A6B}.meter i[data-a="na"]{background:transparent;border:1px dashed #26324f}
+.tally{padding:2px 16px 4px;color:#8E9BB8;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px}
+#result{margin-top:10px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:12px;padding:20px}
+#result[hidden]{display:none}
+#verdict{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px}
+#sub{color:var(--muted);margin:0 0 14px}
+#fixes{margin:0 0 16px;padding-left:20px}#fixes li{margin-bottom:10px}
+#fixes li b{color:var(--no)}
+.rule{border-left:3px solid var(--no);padding-left:12px;color:var(--muted);font-size:14px}
+.offer{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:var(--raise);border-radius:10px;padding:16px;margin-top:16px}
+@media (max-width:560px){.offer{grid-template-columns:1fr}}
+.offer p{margin:0}.offer .price{font-size:26px;font-weight:800;color:var(--gold)}
+a.btn{display:inline-block;background:var(--gold);color:#0A0E1A;font-weight:700;text-decoration:none;padding:11px 18px;border-radius:8px;text-align:center}
+a.btn.ghost{background:none;color:var(--text);border:1px solid var(--line)}
+a.btn:focus-visible,button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+button{font:inherit;background:none;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:40px}
+footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:14px}footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="brand">Rynaut free check</div>
+  <h1>Follow one request through your MCP server</h1>
+  <p class="lede">Ten yes/no questions, in the order a tool call meets your server: arrive, prove who's calling, route, permit, remember. Checked against the 2026-07-28 MCP specification. About 5 minutes, and your answers never leave this page.</p>
+  <div class="legend"><span><span class="chip spec">SPEC</span>the specification requires it</span><span><span class="chip prac">PRACTICE</span>our production recommendation</span></div>
+</header>
+
+<div class="grid">
+<main>
+  <div class="transport" role="radiogroup" aria-label="Transport">
+    <span>Your server runs</span>
+    <div class="seg"><label><input type="radio" name="transport" value="http" checked>Remote (HTTP)</label><label><input type="radio" name="transport" value="stdio">Local only (STDIO)</label></div>
+    <p class="note">STDIO servers take credentials from the environment, so the authorization questions switch off.</p>
+  </div>
+  <form id="f" novalidate></form>
+
+  <section id="result" hidden aria-live="polite">
+    <p id="verdict"></p>
+    <p id="sub"></p>
+    <ol id="fixes"></ol>
+    <p class="rule">A "No" on a SPEC question is a gap against the specification, whatever the total. This is a screening check, not a security audit or certification.</p>
+    <div class="offer">
+      <p><b>MCP 2026-07-28 Least-Privilege Blueprint</b><br><span style="color:var(--muted)">Each fix above as a template or tested Python: metadata files, a tier and scope policy, a guard that returns the exact 401/403 responses, signed MRTR approvals, cache and Tasks rules, a hash-chained audit log, and a control map for 21 CFR Part 11, EU AI Act, SOC 2 and NIST 800-53.</span></p>
+      <div class="price">$49</div>
+    </div>
+    <div class="actions">
+      <a class="btn" id="cta-blueprint" href="https://rynaut.gumroad.com/l/mcp-least-privilege-blueprint?utm_source=mcp_check">Get the Blueprint</a>
+      <a class="btn ghost" id="cta-bundle" href="https://rynaut.gumroad.com/l/agent-production-bundle?utm_source=mcp_check">Get it with the Agent Review Kit, $79</a>
+      <button type="button" id="copy">Copy my gap list</button>
+      <button type="button" id="reset">Start again</button>
+    </div>
+    <p id="copied" role="status" style="color:var(--muted);font-size:14px;margin:8px 0 0"></p>
+  </section>
+</main>
+
+<aside aria-label="Request trace">
+  <div class="trace" id="trace">
+    <div class="cap">One tool call, line by line. Lines turn teal when your answer is yes and red when it's a gap.</div>
+    <div id="lines"></div>
+    <div class="meter" id="meter"></div>
+    <div class="tally" id="tally">0 of 10 answered</div>
+  </div>
+</aside>
+</div>
+
+<footer>Rynaut · <a href="../">More free tools</a> · <a href="../quick-check/">AI Agent Boundary Quick Check</a> · Basis: <a href="https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization">MCP 2026-07-28 authorization</a>, <a href="https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/caching">caching</a> · Not a certification or audit.</footer>
+</div>
+<script>
+"use strict";
+const STAGES = [
+  {name:"Arrive", hint:"before any token is checked"},
+  {name:"Prove who's calling", hint:"the access token"},
+  {name:"Route", hint:"headers and request fields"},
+  {name:"Permit", hint:"what this caller may do"},
+  {name:"Remember", hint:"what is kept afterwards"}
+];
+const Q = [
+ {id:"M1",st:0,spec:true,http:true,t:"Unauthenticated calls get a 401 that points to your published protected-resource metadata.",
+  s:"RFC 9728 document at /.well-known/oauth-protected-resource, linked from WWW-Authenticate.",
+  fix:"Publish Protected Resource Metadata and point every 401 to it (spec: MCP servers MUST)."},
+ {id:"M2",st:0,spec:true,http:true,t:"Clients register with a Client ID Metadata Document or pre-registration, not new Dynamic Client Registration.",
+  s:"DCR is deprecated in 2026-07-28; clients also validate iss (RFC 9207) before redeeming a code.",
+  fix:"Move registration to CIMD or pre-registration and validate iss before redeeming codes."},
+ {id:"M3",st:1,spec:true,http:true,t:"Tokens not issued for this server are rejected.",
+  s:"Audience equals your canonical server URI (RFC 8707); anything else gets a 401.",
+  fix:"Check the token audience against your canonical server URI and reply 401 otherwise (spec MUST)."},
+ {id:"M4",st:1,spec:true,http:true,t:"The caller's token is never forwarded to downstream APIs.",
+  s:"Each downstream system gets the server's own narrow credential.",
+  fix:"Stop token passthrough: one service credential per downstream integration (spec MUST NOT)."},
+ {id:"M5",st:2,spec:true,http:true,t:"Mcp-Method, Mcp-Name and any Mcp-Param-* headers must match the JSON-RPC body, or the request is rejected.",
+  s:"These headers are required on Streamable HTTP in 2026-07-28 so gateways can route without reading the body.",
+  fix:"Route and block on Mcp-Name at the edge; in the server, reject any header that disagrees with the body."},
+ {id:"M6",st:2,spec:false,http:false,t:"Nothing in _meta grants access, and no secret is ever mirrored into a header.",
+  s:"_meta carries what the client says about itself. x-mcp-header copies arguments into headers that proxies log.",
+  fix:"Take identity only from the validated token, strip authorization-looking _meta keys, and never mark secrets with x-mcp-header."},
+ {id:"M7",st:3,spec:true,http:true,t:"Each tool needs explicit scopes; a missing one returns 403 insufficient_scope listing every scope needed.",
+  s:"One challenge for the whole operation, and scope hierarchies honoured.",
+  fix:"Map every tool to scopes and answer gaps with a single 403 challenge listing all of them (spec SHOULD)."},
+ {id:"M8",st:3,spec:false,http:false,t:"Critical tools need fresh authorization, a named human approver, an idempotency key and a signed MRTR state.",
+  s:"Pay, delete, deploy, send externally. A paused input_required request can't be answered by the AI agent itself.",
+  fix:"Tier your tools. For critical ones require step-up freshness, an approver from your identity provider, an idempotency key, and a signed requestState bound to user, tool and arguments."},
+ {id:"M9",st:4,spec:true,http:false,t:"Results that depend on the user are cached as private, never public.",
+  s:"cacheScope public may be shared across users and tokens; MRTR retries are never cached.",
+  fix:"Set cacheScope private whenever a result depends on who asks, and authorize every primitive regardless of cache hints."},
+ {id:"M10",st:4,spec:false,http:false,t:"Every tool call leaves a tamper-evident audit record, with sensitive values hashed and nothing written to stdout.",
+  s:"Who, which tool, which decision, when. Hash-chained, append-only storage.",
+  fix:"Write one hash-chained JSON record per call with keyed-hash redaction, to a file or collector, never to stdout."}
+];
+const TRACE = [
+  {txt:"GET /.well-known/oauth-protected-resource", q:"M1"},
+  {txt:"client_id = https://agent.example/meta.json", q:"M2"},
+  {txt:"POST /mcp", sep:true},
+  {txt:"MCP-Protocol-Version: 2026-07-28", sep:true},
+  {txt:"Authorization: Bearer … aud=https://mcp.example.com", q:"M3"},
+  {txt:"Mcp-Method: tools/call", q:"M5"},
+  {txt:"Mcp-Name: issue_refund", q:"M5"},
+  {txt:"Mcp-Param-Invoice_Id: INV-1001", q:"M6"},
+  {txt:'{"params":{"name":"issue_refund", "_meta":{…}}}', q:"M6"},
+  {txt:"403 insufficient_scope scope=\"payout:execute ledger:read\"", q:"M7"},
+  {txt:"input_required · requestState signed, expires 300 s", q:"M8"},
+  {txt:"→ payments API with the server's own credential", q:"M4"},
+  {txt:"cacheScope: \"private\"  ttlMs: 60000", q:"M9"},
+  {txt:"audit +1 · prev_record_sha256 a91f…", q:"M10"}
+];
+const $ = id => document.getElementById(id);
+const form = $("f");
+STAGES.forEach((st, si) => {
+  const sec = document.createElement("section"); sec.className = "stage";
+  sec.innerHTML = `<h2><b>${si + 1}. ${st.name}</b>${st.hint}</h2>`;
+  Q.filter(q => q.st === si).forEach(q => {
+    const n = Q.indexOf(q) + 1;
+    const d = document.createElement("div"); d.className = "q"; d.id = "q-" + q.id;
+    d.innerHTML = `<p class="t">${q.t} <span class="chip ${q.spec ? "spec" : "prac"}">${q.spec ? "SPEC" : "PRACTICE"}</span></p>
+      <div class="yn" role="radiogroup" aria-label="Question ${n}">
+        <label><input type="radio" name="${q.id}" value="yes"><span>Yes</span></label>
+        <label><input type="radio" name="${q.id}" value="no"><span>No</span></label></div>
+      <p class="s">${q.s}</p>`;
+    sec.appendChild(d);
+  });
+  form.appendChild(sec);
+});
+$("lines").innerHTML = TRACE.map((l, i) => `<div class="ln${l.sep ? " sep" : ""}" id="ln-${i}"><i class="d"></i><code>${l.txt.replace(/</g, "&lt;")}</code></div>`).join("");
+$("meter").innerHTML = Q.map(q => `<i id="m-${q.id}"></i>`).join("");
+
+const stdio = () => document.querySelector("input[name=transport]:checked").value === "stdio";
+const ans = id => (document.querySelector(`input[name=${id}]:checked`) || {}).value;
+
+function render(changed) {
+  const off = stdio();
+  Q.forEach(q => {
+    const na = off && q.http, el = $("q-" + q.id);
+    el.classList.toggle("na", na);
+    el.querySelectorAll("input").forEach(i => i.disabled = na);
+    el.dataset.a = na ? "" : (ans(q.id) || "");
+    $("m-" + q.id).dataset.a = na ? "na" : (ans(q.id) || "");
+  });
+  TRACE.forEach((l, i) => {
+    const el = $("ln-" + i);
+    if (!l.q) return;
+    const q = Q.find(x => x.id === l.q);
+    el.dataset.a = off && q.http ? "na" : (ans(q.id) || "");
+    el.classList.toggle("hit", changed === q.id);
+  });
+  const qs = Q.filter(q => !(off && q.http));
+  const done = qs.filter(q => ans(q.id)).length;
+  $("tally").textContent = `${done} of ${qs.length} answered`;
+  if (done < qs.length) { $("result").hidden = true; return; }
+  const gaps = qs.filter(q => ans(q.id) === "no");
+  const specGaps = gaps.filter(q => q.spec).length;
+  $("verdict").textContent = !gaps.length ? "No gaps found on this request path."
+    : `${gaps.length} gap${gaps.length > 1 ? "s" : ""} on the request path`;
+  $("sub").textContent = !gaps.length ? "Keep the evidence for each answer; your reviewer will ask for it."
+    : `${specGaps} against the specification, ${gaps.length - specGaps} against production practice. Fix them in this order:`;
+  $("fixes").innerHTML = gaps.map(q => `<li><b>${q.id}</b> ${q.fix}</li>`).join("");
+  $("fixes").hidden = !gaps.length;
+  const wasHidden = $("result").hidden;
+  $("result").hidden = false;
+  if (wasHidden) $("result").scrollIntoView({block: "start"});
+}
+document.addEventListener("change", e => render(e.target.name));
+$("reset").addEventListener("click", () => { form.reset(); $("copied").textContent = ""; render(); window.scrollTo(0, 0); });
+$("copy").addEventListener("click", async () => {
+  const off = stdio();
+  const gaps = Q.filter(q => !(off && q.http) && ans(q.id) === "no");
+  const text = "MCP least-privilege gaps (rynaut.github.io/mcp-check):\n" + (gaps.map(q => `- ${q.id}: ${q.fix}`).join("\n") || "- none");
+  try { await navigator.clipboard.writeText(text); $("copied").textContent = "Copied."; }
+  catch (e) { $("copied").textContent = text; }
+});
+window.mcpCheck = {render, Q};
+render();
+</script>
+</body>
+</html>
