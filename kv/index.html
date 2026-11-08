@@ -61,7 +61,7 @@ footer a{color:var(--muted)}
   </div>
 
   <section class="panel" aria-live="polite">
-    <div class="total"><span id="total">0</span><span>GiB needed</span><span id="verdict"></span></div>
+    <div class="total"><span id="total">0</span><span>GiB needed</span><span id="verdict"></span><span id="preset-badge" hidden style="font:600 12px/1 ui-monospace,Consolas,monospace;color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:3px 7px">Loaded from Signal Preset</span></div>
     <div class="bar" id="bar" aria-hidden="true"></div>
     <p class="note" id="barnote"></p>
     <table id="rows"></table>
@@ -227,16 +227,40 @@ function writeUrl() {
   for (const k of [...NUM_KEYS, ...SEL_KEYS]) if (sel.value !== "custom" && MODEL_KEYS.includes(k)) continue; else q.set(k, $(k).value);
   history.replaceState(null, "", "?" + q.toString());
 }
+const PRESET_ALIASES = {
+  "qwen30b_moe": "qwen-30b-a3b",
+  "qwen30b": "qwen-30b-a3b",
+  "qwen32b": "qwen25-32b",
+  "qwen25_32b": "qwen25-32b",
+  "llama8b": "llama3-8b",
+  "llama70b": "llama3-70b"
+};
 function readUrl() {
-  const q = new URLSearchParams(location.search);
-  const preset = PRESETS[q.get("preset")] ? q.get("preset") : DEFAULTS.preset;
+  const rawSearch = location.search;
+  const q = new URLSearchParams(rawSearch);
+  const rawPreset = q.get("preset") || "";
+  const mappedPreset = PRESET_ALIASES[rawPreset] || rawPreset;
+  const preset = PRESETS[mappedPreset] ? mappedPreset : DEFAULTS.preset;
   sel.value = preset; applyPreset(preset);
-  for (const k of [...NUM_KEYS, ...SEL_KEYS]) {
+  if (q.has("ctx") && !q.has("tokens")) q.set("tokens", q.get("ctx"));
+  for (const k of NUM_KEYS) {
     if (MODEL_KEYS.includes(k) && preset !== "custom") continue;
     const v = q.get(k);
-    if (v !== null && v !== "") $(k).value = v; else if (k in DEFAULTS) $(k).value = DEFAULTS[k];
+    const parsed = v !== null && v !== "" ? parseFloat(v) : NaN;
+    if (Number.isFinite(parsed) && parsed >= 0) $(k).value = String(parsed);
+    else if (k in DEFAULTS) $(k).value = DEFAULTS[k];
+  }
+  for (const k of SEL_KEYS) {
+    const v = q.get(k);
+    const validOpts = Array.from($(k).options).map(o => o.value);
+    if (v !== null && validOpts.includes(v)) $(k).value = v;
+    else if (k in DEFAULTS) $(k).value = DEFAULTS[k];
   }
   setMode(q.get("mode") || DEFAULTS.mode);
+  if (rawSearch && rawSearch.length > 1) {
+    const badge = $("preset-badge");
+    if (badge) badge.hidden = false;
+  }
 }
 sel.addEventListener("change", () => { applyPreset(sel.value); compute(); });
 $("f").addEventListener("input", e => {

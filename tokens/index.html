@@ -56,14 +56,17 @@ footer a{color:var(--muted)}
   <p class="lede">Enter your traffic and your provider's prices. See the monthly bill now, and how much each lever saves: fewer retries, a shorter context, prompt caching, a smaller model for easy requests. Everything is calculated in this page: nothing is stored or sent.</p>
 
   <section class="panel" aria-live="polite">
-    <div class="total"><span id="total">0</span><span>per month now</span><span id="verdict" class="ok"></span></div>
+    <div class="total"><span id="total">0</span><span>per month now</span><span id="verdict" class="ok"></span><span id="preset-badge" hidden style="font:600 12px/1 ui-monospace,Consolas,monospace;color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:3px 7px">Loaded from Signal Preset</span></div>
     <table id="steps"></table>
     <p class="note">Levers are applied in the order shown; each saving is measured after the ones above it, so the parts add up to the total.</p>
   </section>
 
   <form id="f" class="panel" novalidate>
-    <h2>Traffic</h2>
+    <h2>Scenario Preset &amp; Traffic</h2>
     <div class="grid">
+      <label>Scenario preset
+        <select id="preset"></select>
+      </label>
       <label>Requests per day<input id="req" type="number" min="0" step="1"></label>
       <label>Input tokens per request (prompt + context)<input id="tin" type="number" min="0" step="1"></label>
       <label>Output tokens per request<input id="tout" type="number" min="0" step="1"></label>
@@ -112,10 +115,22 @@ footer a{color:var(--muted)}
 </main>
 <script>
 "use strict";
-const DEFAULTS = {req:10000, tin:3000, tout:500, days:30, pin:3, pout:15, sin:0.25, sout:1.25, cmul:0.1,
-  r0:10, r1:2, t0:0, t1:20, h0:0, h1:50, s0:0, s1:30};
+const PRESETS = {
+  "default":          {name:"Standard Workload (10k req/day)", req:10000, tin:3000,  tout:500, days:30, pin:3, pout:15, sin:0.25, sout:1.25, cmul:0.1, r0:10, r1:2, t0:0, t1:20, h0:0, h1:50, s0:0, s1:30},
+  "judge-cascade":    {name:"Small Judge + Opus Fallback (85% small routing = 4x cut)", req:10000, tin:3000, tout:500, days:30, pin:3, pout:15, sin:0.25, sout:1.25, cmul:0.1, r0:10, r1:2, t0:0, t1:20, h0:0, h1:50, s0:0, s1:85},
+  "mcp-bloat":        {name:"Bloated MCP + Dynamic Header vs Clean Prefix Cache", req:5000, tin:16000, tout:800, days:30, pin:3, pout:15, sin:0.25, sout:1.25, cmul:0.1, r0:15, r1:2, t0:0, t1:35, h0:0, h1:75, s0:0, s1:30},
+  "agent-retry-loop": {name:"Multi-Turn Agent Retry Loop (25% retries → 2%)", req:8000, tin:8000, tout:1000, days:30, pin:3, pout:15, sin:0.25, sout:1.25, cmul:0.1, r0:25, r1:2, t0:0, t1:25, h0:0, h1:60, s0:0, s1:40}
+};
+const DEFAULTS = {...PRESETS["default"]};
 const KEYS = Object.keys(DEFAULTS);
 const $ = id => document.getElementById(id);
+const sel = $("preset");
+for (const [k, p] of Object.entries(PRESETS)) sel.add(new Option(p.name, k));
+
+function applyPreset(k) {
+  const p = PRESETS[k] || PRESETS["default"];
+  for (const key of KEYS) $(key).value = p[key];
+}
 const v = id => { const x = parseFloat($(id).value); return Number.isFinite(x) && x >= 0 ? x : 0; };
 const pct = id => Math.min(v(id), 100) / 100;
 const money = x => "$" + (x >= 100 ? Math.round(x).toLocaleString("en-US") : x.toFixed(2));
@@ -155,14 +170,27 @@ function compute() {
   return out;
 }
 function writeUrl() {
-  const q = new URLSearchParams();
+  const q = new URLSearchParams({preset: sel.value});
   for (const k of KEYS) q.set(k, $(k).value);
   history.replaceState(null, "", "?" + q.toString());
 }
 function readUrl() {
-  const q = new URLSearchParams(location.search);
-  for (const k of KEYS) { const x = q.get(k); $(k).value = x !== null && x !== "" ? x : DEFAULTS[k]; }
+  const rawSearch = location.search;
+  const q = new URLSearchParams(rawSearch);
+  const preset = PRESETS[q.get("preset")] ? q.get("preset") : "default";
+  sel.value = preset;
+  applyPreset(preset);
+  for (const k of KEYS) {
+    const x = q.get(k);
+    const parsed = x !== null && x !== "" ? parseFloat(x) : NaN;
+    if (Number.isFinite(parsed) && parsed >= 0) $(k).value = String(parsed);
+  }
+  if (rawSearch && rawSearch.length > 1) {
+    const badge = $("preset-badge");
+    if (badge) badge.hidden = false;
+  }
 }
+sel.addEventListener("change", () => { applyPreset(sel.value); $("f").dispatchEvent(new Event("input", {bubbles: true})); });
 $("f").addEventListener("input", compute);
 $("share").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(location.href); $("copied").textContent = "Copied."; }
