@@ -78,6 +78,18 @@ a.btn.ghost{background:none;color:var(--text);border:1px solid var(--line)}
 a.btn:focus-visible,button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 button{font:inherit;background:none;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:40px}
+.paste{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.paste h2{margin:0 0 6px;font-size:19px;letter-spacing:-.01em}
+.paste p{margin:0 0 10px;color:var(--muted);font-size:14px}
+.paste textarea{width:100%;min-height:150px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font:13px/1.5 ui-monospace,Consolas,monospace;resize:vertical}
+.paste textarea:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+#pasteOut{margin-top:12px}
+#pasteOut .f{border-left:3px solid var(--no);padding:6px 0 6px 12px;margin:0 0 10px}
+#pasteOut .f.medium{border-left-color:var(--gold)}
+#pasteOut .tag{font:600 12px/1 ui-monospace,Consolas,monospace;border:1px solid currentColor;border-radius:5px;padding:3px 5px;margin-right:6px;color:var(--gold)}
+#pasteOut .w{font:13px ui-monospace,Consolas,monospace;color:var(--muted)}
+#pasteOut .ok{color:var(--teal);font-weight:600}
+#pasteOut .err{color:var(--no);font-weight:600}
 footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:14px}footer a{color:var(--muted)}
 </style>
 </head>
@@ -116,6 +128,14 @@ footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid va
     </div>
     <p id="copied" role="status" style="color:var(--muted);font-size:14px;margin:8px 0 0"></p>
   </section>
+  <section class="paste" id="paste" aria-labelledby="pasteH">
+    <h2 id="pasteH">Or paste your config</h2>
+    <p>Paste a <code>.mcp.json</code>, a Claude settings file, or a <code>tools/list</code> response. It runs in this page; nothing is uploaded, fetched or executed. It checks three things: wildcard approvals, <b>unpinned</b> packages and registry namespaces (no exact version or hash written in the paste), and read + write + network tool combinations. The tool check is a <b>keyword heuristic</b> on names and descriptions, so treat it as a prompt to look, not a verdict.</p>
+    <label for="pasteIn" style="font-weight:600;font-size:14px">Config or tools/list JSON</label>
+    <textarea id="pasteIn" spellcheck="false" autocomplete="off" placeholder='{"mcpServers": {"fs": {"command": "npx", "args": ["-y", "some-mcp-server"]}}}'></textarea>
+    <div class="actions"><button type="button" id="pasteGo">Check pasted config</button><button type="button" id="pasteClear">Clear</button></div>
+    <div id="pasteOut" aria-live="polite"></div>
+  </section>
 </main>
 
 <aside aria-label="Request trace">
@@ -130,6 +150,31 @@ footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid va
 
 <footer>Rynaut · <a href="../">More free tools</a> · <a href="../quick-check/">AI Agent Boundary Quick Check</a> · Basis: <a href="https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization">MCP 2026-07-28 authorization</a>, <a href="https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/caching">caching</a> · Not a certification or audit.</footer>
 </div>
+<script src="audit.js"></script>
+<script>
+"use strict";
+(function () {
+  var out = document.getElementById("pasteOut"), inp = document.getElementById("pasteIn");
+  function line(cls, text) { var d = document.createElement("div"); d.className = cls; d.textContent = text; return d; }
+  document.getElementById("pasteGo").addEventListener("click", function () {
+    out.textContent = "";
+    var r = McpAudit.audit(inp.value);
+    if (r.error) { out.appendChild(line("err", r.error)); return; }
+    if (r.shape === "unknown") { out.appendChild(line("w", "No MCP servers, approvals or tools found in that JSON, so nothing was checked.")); return; }
+    out.appendChild(line("w", "Recognised: " + r.shape + ". Method: " + r.method + "."));
+    if (!r.findings.length) { out.appendChild(line("ok", "No findings from these three checks. That does not make the servers safe.")); return; }
+    r.findings.forEach(function (f) {
+      var d = line("f " + f.severity, "");
+      var tag = document.createElement("span"); tag.className = "tag"; tag.textContent = f.rule; d.appendChild(tag);
+      var w = document.createElement("span"); w.className = "w"; w.textContent = f.where; d.appendChild(w);
+      var p1 = document.createElement("div"); p1.textContent = f.detail; d.appendChild(p1);
+      var p2 = document.createElement("div"); p2.style.color = "var(--muted)"; p2.textContent = "Fix: " + f.fix; d.appendChild(p2);
+      out.appendChild(d);
+    });
+  });
+  document.getElementById("pasteClear").addEventListener("click", function () { inp.value = ""; out.textContent = ""; });
+})();
+</script>
 <script>
 "use strict";
 const STAGES = [
