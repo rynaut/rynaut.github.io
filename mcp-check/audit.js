@@ -54,6 +54,46 @@
   function pypiPinned(spec) { return /==\s*\d+(\.\d+)*/.test(spec) || /@[\da-f]{7,40}$/i.test(spec); }
   function dockerPinned(img) { return /@sha256:[0-9a-f]{64}$/i.test(img); }
 
+  // ---- known advisories (version detection only; no exploit details) --------------------------
+  // Each entry: a PyPI package, the first fixed version, and the advisory page that was read.
+  var ADVISORIES = [{
+    id: "GHSA-6hqx-gqrx-c5r2",
+    pkg: "mcp-server-git",
+    fixed: "2026.11.11",
+    url: "https://github.com/modelcontextprotocol/servers/security/advisories/GHSA-6hqx-gqrx-c5r2",
+    title: "mcp-server-git before 2026.11.11 (arbitrary command execution through a repository's own Git configuration)"
+  }];
+
+  function normPkg(n) { return String(n).toLowerCase().replace(/[-_.]+/g, "-"); }
+
+  // Leading numeric groups of a version ("2026.11.11", "2026.11.11.post1" -> [2026,11,11]); null if none.
+  function versionParts(v) {
+    var m = /^(\d+(?:\.\d+)*)/.exec(String(v).trim());
+    return m ? m[1].split(".").map(Number) : null;
+  }
+  function olderThan(a, b) {            // numeric, element by element (2026.2.3 < 2026.11.11)
+    for (var i = 0; i < Math.max(a.length, b.length); i++) {
+      var x = a[i] === undefined ? 0 : a[i], y = b[i] === undefined ? 0 : b[i];
+      if (x !== y) return x < y;
+    }
+    return false;
+  }
+
+  function checkAdvisories(spec, where, findings) {
+    var m = /^([A-Za-z0-9._-]+)==\s*([^\s;,]+)/.exec(spec);          // an exact pin only: the version is then known
+    if (!m) return;
+    var name = normPkg(m[1]), have = versionParts(m[2]);
+    if (!have) return;
+    ADVISORIES.forEach(function (adv) {
+      if (name !== normPkg(adv.pkg)) return;
+      if (olderThan(have, versionParts(adv.fixed))) {
+        add(findings, "known-vulnerable-version", "high", where,
+          adv.pkg + "==" + m[2] + " is older than " + adv.fixed + ", the first fixed version in advisory " + adv.id + " (" + adv.title + "). This is a version match only; the page cannot tell whether your setup is exposed.",
+          "Upgrade to " + adv.fixed + " or later and pin that exact version.", { advisory: adv.url, advisoryId: adv.id });
+      }
+    });
+  }
+
   function firstPackageArg(args) {
     for (var i = 0; i < args.length; i++) {
       var a = String(args[i]);
@@ -71,6 +111,7 @@
     if (RUNNERS[cmd]) {
       var pkg = firstPackageArg(args);
       if (!pkg) return;
+      if (RUNNERS[cmd] === "pypi") checkAdvisories(pkg, where, findings);
       var pinned = RUNNERS[cmd] === "npm" ? npmPinned(pkg) : pypiPinned(pkg);
       if (!pinned) add(findings, "unpinned", "medium", where,
         "\"" + pkg + "\" has no exact version in this config (" + cmd + "), so the config does not fix which release you get.",

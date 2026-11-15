@@ -169,6 +169,7 @@ footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid va
       var w = document.createElement("span"); w.className = "w"; w.textContent = f.where; d.appendChild(w);
       var p1 = document.createElement("div"); p1.textContent = f.detail; d.appendChild(p1);
       var p2 = document.createElement("div"); p2.style.color = "var(--muted)"; p2.textContent = "Fix: " + f.fix; d.appendChild(p2);
+      if (f.advisory && f.advisory.indexOf("https://github.com/") === 0) { var p3 = document.createElement("div"); var al = document.createElement("a"); al.href = f.advisory; al.rel = "noopener noreferrer"; al.textContent = "Advisory " + f.advisoryId; p3.appendChild(al); d.appendChild(p3); }
       out.appendChild(d);
     });
   });

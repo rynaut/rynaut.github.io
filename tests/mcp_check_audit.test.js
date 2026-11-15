@@ -136,7 +136,7 @@ test("heuristic note is always present for tool lists", () => {
 });
 
 test("clean pinned config has zero findings", () => {
-  const r = audit(JSON.stringify({ mcpServers: { git: { command: "uvx", args: ["mcp-server-git==0.6.2"] } }, permissions: { allow: ["mcp__git__git_status"] } }));
+  const r = audit(JSON.stringify({ mcpServers: { git: { command: "uvx", args: ["mcp-server-git==2026.11.11"] } }, permissions: { allow: ["mcp__git__git_status"] } }));
   assert.deepStrictEqual(r.findings, []);
 });
 
