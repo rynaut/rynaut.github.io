@@ -73,7 +73,7 @@
       if (!pkg) return;
       var pinned = RUNNERS[cmd] === "npm" ? npmPinned(pkg) : pypiPinned(pkg);
       if (!pinned) add(findings, "unpinned", "medium", where,
-        "\"" + pkg + "\" is fetched at run time with no exact version in this config (" + cmd + "), so a new release runs the next time it starts.",
+        "\"" + pkg + "\" has no exact version in this config (" + cmd + "), so the config does not fix which release you get.",
         RUNNERS[cmd] === "npm" ? "Pin an exact version, for example " + pkg.replace(/@.*$/, "") + "@1.2.3." : "Pin an exact version, for example " + pkg.replace(/[=<>~!@].*$/, "") + "==1.2.3.");
     } else if (cmd === "docker" || cmd === "podman") {
       var img = null;
