@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Boundary Quick Check</title>
-<meta name="description" content="A 5-minute self-check for one AI agent workflow: 10 yes/no questions, one per production boundary. Runs in your browser; nothing is sent anywhere.">
+<meta name="description" content="A 5-minute self-check for one AI agent workflow: 10 yes/no questions, one per production boundary. Your answers never leave your browser. The page counts visits and runs, with no cookies.">
 <style>
 :root{--bg:#0A0E1A;--panel:#121829;--line:#24304d;--text:#E8ECF5;--muted:#9AA6C1;--gold:#F5C842;--teal:#00E5FF;--no:#FF7A6B;--yes:#55D69A;color-scheme:dark}
 @media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--no:#B3261E;--yes:#1B7F4E;color-scheme:light}}
@@ -38,7 +38,7 @@ footer{margin-top:32px;color:var(--muted);font-size:13px;border-top:1px solid va
 <main>
   <div class="kicker">Rynaut // Free 5-minute check</div>
   <h1>AI Agent Boundary Quick Check</h1>
-  <p class="lede">Pick one agent workflow. Answer 10 questions, one per production boundary (B01–B10). Your answers stay in this page: nothing is stored or sent.</p>
+  <p class="lede">Pick one agent workflow. Answer 10 questions, one per production boundary (B01–B10). Your answers never leave your browser. The page counts visits and runs, with no cookies.</p>
 
   <form id="qc" novalidate></form>
   <p id="progress" aria-live="polite">0 of 10 answered</p>
@@ -121,5 +121,6 @@ document.getElementById("reset").addEventListener("click", () => { form.reset();
 update();
 </script>
 <script src="../assets/counter.js" defer></script>
+<script>document.addEventListener("DOMContentLoaded",function(){window.rynautWatchUse&&rynautWatchUse("quick-check-run");});</script>
 </body>
 </html>

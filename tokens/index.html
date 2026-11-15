@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LLM Token Bill Estimator</title>
-<meta name="description" content="Estimate your monthly LLM API bill and what each lever saves: fewer retries, trimmed context, prompt caching and routing to a smaller model. Runs in your browser; nothing is sent anywhere.">
+<meta name="description" content="Estimate your monthly LLM API bill and what each lever saves: fewer retries, trimmed context, prompt caching and routing to a smaller model. Your inputs never leave your browser. The page counts visits and runs, with no cookies.">
 <style>
 :root{--bg:#0A0E1A;--panel:#121829;--line:#24304d;--text:#E8ECF5;--muted:#9AA6C1;--gold:#F5C842;--teal:#00E5FF;--bad:#FF7A6B;--ok:#55D69A;
 --c1:#00E5FF;--c2:#F5C842;--c3:#B48CFF;--c4:#FF9F5A;--c5:#55D69A;--c6:#9AA6C1;color-scheme:dark}
@@ -53,7 +53,7 @@ footer a{color:var(--muted)}
 <main>
   <div class="kicker">Rynaut // Where the token actually goes</div>
   <h1>What will my LLM bill be, and what cuts it?</h1>
-  <p class="lede">Enter your traffic and your provider's prices. See the monthly bill now, and how much each lever saves: fewer retries, a shorter context, prompt caching, a smaller model for easy requests. Everything is calculated in this page: nothing is stored or sent.</p>
+  <p class="lede">Enter your traffic and your provider's prices. See the monthly bill now, and how much each lever saves: fewer retries, a shorter context, prompt caching, a smaller model for easy requests. Everything is calculated in this page. Your inputs never leave your browser; the page counts visits and runs, with no cookies.</p>
 
   <section class="panel" aria-live="polite">
     <div class="total"><span id="total">0</span><span>per month now</span><span id="verdict" class="ok"></span><span id="preset-badge" hidden style="font:600 12px/1 ui-monospace,Consolas,monospace;color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:3px 7px">Loaded from Signal Preset</span></div>
@@ -201,5 +201,6 @@ window.tokenCalc = {compute, bill};
 compute();
 </script>
 <script src="../assets/counter.js" defer></script>
+<script>document.addEventListener("DOMContentLoaded",function(){window.rynautWatchUse&&rynautWatchUse("tokens-run");});</script>
 </body>
 </html>

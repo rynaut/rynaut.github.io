@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stale Fact Tester — Why Vector Search Returns Expired Facts | Rynaut</title>
-<meta name="description" content="Paste an old fact, a new fact, and a question. Compute cosine similarity in your browser (all-MiniLM-L6-v2, nothing uploaded), toggle a bi-temporal valid-time & transaction-time filter, and watch the valid fact win.">
+<meta name="description" content="Paste an old fact, a new fact, and a question. Compute cosine similarity in your browser (all-MiniLM-L6-v2). Your inputs never leave your browser; the page counts visits and runs, with no cookies, toggle a bi-temporal valid-time & transaction-time filter, and watch the valid fact win.">
 <style>
   :root {
     --bg: #F8F9FA;
@@ -1188,5 +1188,6 @@
 })();
 </script>
 <script src="../assets/counter.js" defer></script>
+<script>document.addEventListener("DOMContentLoaded",function(){window.rynautWatchUse&&rynautWatchUse("stale-run");});</script>
 </body>
 </html>

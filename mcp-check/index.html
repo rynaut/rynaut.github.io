@@ -98,7 +98,7 @@ footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid va
 <header>
   <div class="brand">Rynaut free check</div>
   <h1>Follow one request through your MCP server</h1>
-  <p class="lede">Ten yes/no questions, in the order a tool call meets your server: arrive, prove who's calling, route, permit, remember. Checked against the 2026-07-28 MCP specification. About 5 minutes, and your answers never leave this page.</p>
+  <p class="lede">Ten yes/no questions, in the order a tool call meets your server: arrive, prove who's calling, route, permit, remember. Checked against the 2026-07-28 MCP specification. About 5 minutes. Your config and answers never leave your browser. The page counts visits and runs, with no cookies.</p>
   <div class="legend"><span><span class="chip spec">SPEC</span>the specification requires it</span><span><span class="chip prac">PRACTICE</span>our production recommendation</span></div>
 </header>
 
@@ -130,7 +130,7 @@ footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid va
   </section>
   <section class="paste" id="paste" aria-labelledby="pasteH">
     <h2 id="pasteH">Or paste your config</h2>
-    <p>Paste a <code>.mcp.json</code>, a Claude settings file, or a <code>tools/list</code> response. It runs in this page; nothing is uploaded, fetched or executed. It checks three things: wildcard approvals, <b>unpinned</b> packages and registry namespaces (no exact version or hash written in the paste), and read + write + network tool combinations. The tool check is a <b>keyword heuristic</b> on names and descriptions, so treat it as a prompt to look, not a verdict.</p>
+    <p>Paste a <code>.mcp.json</code>, a Claude settings file, or a <code>tools/list</code> response. Your config never leaves your browser. The page counts visits and runs, with no cookies. The check itself runs in this page and executes nothing. It checks three things: wildcard approvals, <b>unpinned</b> packages and registry namespaces (no exact version or hash written in the paste), and read + write + network tool combinations. The tool check is a <b>keyword heuristic</b> on names and descriptions, so treat it as a prompt to look, not a verdict.</p>
     <label for="pasteIn" style="font-weight:600;font-size:14px">Config or tools/list JSON</label>
     <textarea id="pasteIn" spellcheck="false" autocomplete="off" placeholder='{"mcpServers": {"fs": {"command": "npx", "args": ["-y", "some-mcp-server"]}}}'></textarea>
     <div class="actions"><button type="button" id="pasteGo">Check pasted config</button><button type="button" id="pasteClear">Clear</button></div>
@@ -301,5 +301,6 @@ window.mcpCheck = {render, Q};
 render();
 </script>
 <script src="../assets/counter.js" defer></script>
+<script>document.addEventListener("DOMContentLoaded",function(){window.rynautWatchUse&&rynautWatchUse("mcp-check-run");var g=document.getElementById("pasteGo");if(g)g.addEventListener("click",function(){window.rynautCountEvent&&rynautCountEvent("mcp-check-paste-check")});});</script>
 </body>
 </html>
