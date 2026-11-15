@@ -7,7 +7,9 @@ const { init } = require("../assets/counter.js");
 
 function env(over) {
   const added = [];
-  const doc = { head: { appendChild: (el) => added.push(el) }, createElement: () => ({ attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } }) };
+  const listeners = {};
+  const doc = { head: { appendChild: (el) => added.push(el) }, createElement: () => ({ attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } }),
+    addEventListener: (t, f) => { (listeners[t] = listeners[t] || []).push(f); }, _fire: (t, ev) => (listeners[t] || []).forEach((f) => f(ev)) };
   const win = {};
   return Object.assign({ code: "", events: false, document: doc, navigator: { doNotTrack: "0" }, window: win, _added: added }, over || {});
 }
@@ -40,7 +42,7 @@ test("an unsafe site code is rejected (letters, digits and hyphens only)", () =>
   }
 });
 
-test("events are off by default: rynautCountEvent does nothing", () => {
+test("events switched off: rynautCountEvent does nothing", () => {
   const calls = [];
   const e = env({ code: "rynaut" });
   e.window.goatcounter = { count: (o) => calls.push(o) };
@@ -73,5 +75,50 @@ test("events on but no code: still nothing", () => {
 test("the shipped file has no site code until the owner sets one", () => {
   const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "assets", "counter.js"), "utf8");
   assert.match(src, /var GOATCOUNTER_CODE = "";/);
-  assert.match(src, /var EVENTS = false;/);
+  assert.match(src, /var EVENTS = true;/);
+});
+
+test("watchUse fires one event on the first input and never again", () => {
+  const calls = [];
+  const e = env({ code: "rynaut", events: true });
+  e.window.goatcounter = { count: (o) => calls.push(o) };
+  init(e);
+  e.window.rynautWatchUse("kv-run");
+  assert.strictEqual(calls.length, 0);               // nothing on load
+  e.document._fire("input", { target: {} });
+  e.document._fire("input", { target: {} });
+  e.document._fire("change", { target: {} });
+  assert.strictEqual(calls.length, 1);
+  assert.strictEqual(calls[0].path, "kv-run");
+});
+
+test("watchUse ignores clicks on non-buttons and counts a button press", () => {
+  const calls = [];
+  const e = env({ code: "rynaut", events: true });
+  e.window.goatcounter = { count: (o) => calls.push(o) };
+  init(e);
+  e.window.rynautWatchUse("stale-run");
+  e.document._fire("click", { target: { closest: () => null } });
+  assert.strictEqual(calls.length, 0);
+  e.document._fire("click", { target: { closest: () => ({}) } });
+  assert.strictEqual(calls.length, 1);
+});
+
+test("the event carries the name only, never page input", () => {
+  const calls = [];
+  const e = env({ code: "rynaut", events: true });
+  e.window.goatcounter = { count: (o) => calls.push(o) };
+  init(e);
+  e.window.rynautWatchUse("mcp-check-run");
+  e.document._fire("input", { target: { value: "SECRET-CONFIG" } });
+  assert.ok(!JSON.stringify(calls).includes("SECRET-CONFIG"));
+  assert.deepStrictEqual(Object.keys(calls[0]).sort(), ["event", "path", "title"]);
+});
+
+test("watchUse without a site code does nothing", () => {
+  const e = env({ events: true });
+  init(e);
+  e.window.rynautWatchUse("kv-run");
+  e.document._fire("input", { target: {} });
+  assert.strictEqual(e._added.length, 0);
 });
