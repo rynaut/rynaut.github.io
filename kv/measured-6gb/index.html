@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>What Fits on a 6 GB Laptop GPU: 30 Measured Cells</title>
+<meta name="description" content="Five models, three context lengths, two KV-cache types on one 6 GB laptop GPU: fits, spills or out of memory. One run per cell, with a same-prompt control, sources and the commands to reproduce.">
+<style>
+:root{--bg:#F4F6FA;--panel:#FFFFFF;--line:#D5DCE8;--text:#0E1424;--muted:#55607A;--teal:#007C8C;--gold:#8A6800;--no:#B3261E;color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0A0E1A;--panel:#111729;--line:#26324f;--text:#E8ECF5;--muted:#97A3BF;--teal:#00E5FF;--gold:#F5C842;--no:#FF7A6B}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 16px 56px}
+a{color:var(--teal)}
+h1{font-size:clamp(26px,4.4vw,40px);line-height:1.1;letter-spacing:-.02em;margin:6px 0 10px}
+h2{font-size:22px;margin:34px 0 8px}
+.brand{font-weight:700;color:var(--gold);font-size:15px}
+.lede{color:var(--muted);max-width:70ch;margin:0 0 8px}
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:8px;padding:10px 14px;margin:14px 0;font-size:15px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
+td:first-child{white-space:normal;min-width:180px}
+th{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+small{color:var(--muted)}
+.chip{font:600 12px/1 ui-monospace,Consolas,monospace;border:1px solid currentColor;border-radius:5px;padding:3px 6px}
+.chip.fits{color:var(--teal)}.chip.spills{color:var(--gold)}.chip.oom{color:var(--no)}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;font:13px/1.5 ui-monospace,Consolas,monospace}
+.cta{display:inline-block;margin-top:10px;padding:11px 18px;border-radius:8px;background:var(--gold);color:#0A0E1A;font-weight:700;text-decoration:none}
+footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="brand">Rynaut measurements</div>
+<h1>What fits on a 6 GB laptop GPU</h1>
+<p class="lede">Five models, three context lengths (4,096, 32,768 and 131,072 tokens) and two KV-cache types, run on one RTX 3050 6GB Laptop GPU. Each of the 30 cells is <b>fits</b>, <b>spills</b> or <b>OOM</b>. Every cell is <b>a single run</b>.</p>
+<div class="note"><b>Single run.</b> One run per cell, not an average and not a benchmark. Speeds vary with what else the machine is doing: the control below repeated one cell three times and the first run was 3.4 to 3.7 times slower than the other two, cause not identified. Read the status columns, treat the speeds as indicative.</div>
+
+<h2>The 30 cells</h2>
+<p class="lede"><b>Fits</b>: the run exited 0 and the llama.cpp log's device buffers (model + KV cache + compute) add up to at most the 6,143 MiB the card reports. <b>Spills</b>: the run exited 0 but those buffers add up to more than 6,143 MiB, so part of the load lived outside dedicated GPU memory; the Windows "shared GPU memory" counter rose. <b>OOM</b>: the run failed with an out-of-memory message. Window = context length requested. KV = KV-cache element type. Speeds come from a fill run with a prompt of about 90% of the window (4,096 and 32,768 only; 131,072 cells are allocation only). Generation speed is from 8 generated tokens, so it is rough.</p>
+<div class="scroll"><table>
+<thead><tr><th>Model</th><th>Window</th><th>KV</th><th>Status</th><th>Buffers (MiB)</th><th>Shared peak (MiB)</th><th>Prompt tok/s</th><th>Gen tok/s</th><th>Log (alloc run)</th></tr></thead>
+<tbody>
+<tr><td>Phi-3-mini-4k (4-bit)</td><td class='n'>4,096</td><td>f16</td><td><span class='chip fits'>fits</span></td><td class='n'>3,855</td><td class='n'>117.2</td><td class='n'>1,232.49</td><td class='n'>17.33</td><td><small>run_20261114T050108_c4096_f16.stderr.txt</small></td></tr>
+<tr><td>Phi-3-mini-4k (4-bit)</td><td class='n'>4,096</td><td>q8_0</td><td><span class='chip fits'>fits</span></td><td class='n'>3,135</td><td class='n'>117.2</td><td class='n'>1,281.68</td><td class='n'>18.36</td><td><small>run_20261114T050128_c4096_q8_0.stderr.txt</small></td></tr>
+<tr><td>Phi-3-mini-4k (4-bit)</td><td class='n'>32,768</td><td>f16</td><td><span class='chip oom'>OOM</span></td><td class='n'>2,229 <small>(weights only: allocation failed)</small></td><td class='n'>1,813.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T050150_c32768_f16.stderr.txt</small></td></tr>
+<tr><td>Phi-3-mini-4k (4-bit)</td><td class='n'>32,768</td><td>q8_0</td><td><span class='chip spills'>spills</span></td><td class='n'>9,203</td><td class='n'>3,527.2</td><td class='n'>40.14</td><td class='n'>0.22</td><td><small>run_20261114T050202_c32768_q8_0.stderr.txt</small></td></tr>
+<tr><td>Phi-3-mini-4k (4-bit)</td><td class='n'>131,072</td><td>f16</td><td><span class='chip oom'>OOM</span></td><td class='n'>2,229 <small>(weights only: allocation failed)</small></td><td class='n'>85.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T051457_c131072_f16.stderr.txt</small></td></tr>
+<tr><td>Phi-3-mini-4k (4-bit)</td><td class='n'>131,072</td><td>q8_0</td><td><span class='chip oom'>OOM</span></td><td class='n'>2,229 <small>(weights only: allocation failed)</small></td><td class='n'>85.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T051505_c131072_q8_0.stderr.txt</small></td></tr>
+<tr><td>Qwen2.5-1.5B-Instruct (Q4_K_M)</td><td class='n'>4,096</td><td>f16</td><td><span class='chip fits'>fits</span></td><td class='n'>1,359</td><td class='n'>105.2</td><td class='n'>3,081.88</td><td class='n'>78.10</td><td><small>run_20261114T051513_c4096_f16.stderr.txt</small></td></tr>
+<tr><td>Qwen2.5-1.5B-Instruct (Q4_K_M)</td><td class='n'>4,096</td><td>q8_0</td><td><span class='chip fits'>fits</span></td><td class='n'>1,307</td><td class='n'>105.2</td><td class='n'>3,320.32</td><td class='n'>70.48</td><td><small>run_20261114T051528_c4096_q8_0.stderr.txt</small></td></tr>
+<tr><td>Qwen2.5-1.5B-Instruct (Q4_K_M)</td><td class='n'>32,768</td><td>f16</td><td><span class='chip fits'>fits</span></td><td class='n'>2,171</td><td class='n'>133.2</td><td class='n'>1,882.53</td><td class='n'>48.80</td><td><small>run_20261114T051543_c32768_f16.stderr.txt</small></td></tr>
+<tr><td>Qwen2.5-1.5B-Instruct (Q4_K_M)</td><td class='n'>32,768</td><td>q8_0</td><td><span class='chip fits'>fits</span></td><td class='n'>1,751</td><td class='n'>133.2</td><td class='n'>1,773.45</td><td class='n'>18.44</td><td><small>run_20261114T051614_c32768_q8_0.stderr.txt</small></td></tr>
+<tr><td>Qwen2.5-1.5B-Instruct (Q4_K_M)</td><td class='n'>131,072</td><td>f16</td><td><span class='chip fits'>fits</span></td><td class='n'>4,955</td><td class='n'>229.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T051647_c131072_f16.stderr.txt</small></td></tr>
+<tr><td>Qwen2.5-1.5B-Instruct (Q4_K_M)</td><td class='n'>131,072</td><td>q8_0</td><td><span class='chip fits'>fits</span></td><td class='n'>3,275</td><td class='n'>85.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T051654_c131072_q8_0.stderr.txt</small></td></tr>
+<tr><td>Llama-3.1-8B-Instruct (Q4_K_M)</td><td class='n'>4,096</td><td>f16</td><td><span class='chip fits'>fits</span></td><td class='n'>5,202</td><td class='n'>116.2</td><td class='n'>822.98</td><td class='n'>21.60</td><td><small>run_20261114T055655_c4096_f16.stderr.txt</small></td></tr>
+<tr><td>Llama-3.1-8B-Instruct (Q4_K_M)</td><td class='n'>4,096</td><td>q8_0</td><td><span class='chip fits'>fits</span></td><td class='n'>4,962</td><td class='n'>116.2</td><td class='n'>802.35</td><td class='n'>18.55</td><td><small>run_20261114T055734_c4096_q8_0.stderr.txt</small></td></tr>
+<tr><td>Llama-3.1-8B-Instruct (Q4_K_M)</td><td class='n'>32,768</td><td>f16</td><td><span class='chip spills'>spills</span></td><td class='n'>8,814</td><td class='n'>3,138.2</td><td class='n'>61.54</td><td class='n'>2.64</td><td><small>run_20261114T055827_c32768_f16.stderr.txt</small></td></tr>
+<tr><td>Llama-3.1-8B-Instruct (Q4_K_M)</td><td class='n'>32,768</td><td>q8_0</td><td><span class='chip spills'>spills</span></td><td class='n'>6,894</td><td class='n'>1,218.2</td><td class='n'>43.95</td><td class='n'>1.44</td><td><small>run_20261114T060700_c32768_q8_0.stderr.txt</small></td></tr>
+<tr><td>Llama-3.1-8B-Instruct (Q4_K_M)</td><td class='n'>131,072</td><td>f16</td><td><span class='chip oom'>OOM</span></td><td class='n'>4,403 <small>(weights only: allocation failed)</small></td><td class='n'>74.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T061829_c131072_f16.stderr.txt</small></td></tr>
+<tr><td>Llama-3.1-8B-Instruct (Q4_K_M)</td><td class='n'>131,072</td><td>q8_0</td><td><span class='chip oom'>OOM</span></td><td class='n'>4,403 <small>(weights only: allocation failed)</small></td><td class='n'>1,804.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T061847_c131072_q8_0.stderr.txt</small></td></tr>
+<tr><td>OLMoE-1B-7B-Instruct (Q4_K_M, MoE)</td><td class='n'>4,096</td><td>f16</td><td><span class='chip fits'>fits</span></td><td class='n'>4,592</td><td class='n'>109.2</td><td class='n'>1,703.65</td><td class='n'>66.86</td><td><small>run_20261114T051710_c4096_f16.stderr.txt</small></td></tr>
+<tr><td>OLMoE-1B-7B-Instruct (Q4_K_M, MoE)</td><td class='n'>4,096</td><td>q8_0</td><td><span class='chip fits'>fits</span></td><td class='n'>4,352</td><td class='n'>109.2</td><td class='n'>2,022.36</td><td class='n'>67.53</td><td><small>run_20261114T051741_c4096_q8_0.stderr.txt</small></td></tr>
+<tr><td>OLMoE-1B-7B-Instruct (Q4_K_M, MoE)</td><td class='n'>32,768</td><td>f16</td><td><span class='chip spills'>spills</span></td><td class='n'>8,204</td><td class='n'>2,495.2</td><td class='n'>176.35</td><td class='n'>2.80</td><td><small>run_20261114T051806_c32768_f16.stderr.txt</small></td></tr>
+<tr><td>OLMoE-1B-7B-Instruct (Q4_K_M, MoE)</td><td class='n'>32,768</td><td>q8_0</td><td><span class='chip spills'>spills</span></td><td class='n'>6,445</td><td class='n'>758.0</td><td class='n'>124.47</td><td class='n'>3.53</td><td><small>run_20261114T052120_c32768_q8_0.stderr.txt</small></td></tr>
+<tr><td>OLMoE-1B-7B-Instruct (Q4_K_M, MoE)</td><td class='n'>131,072</td><td>f16</td><td><span class='chip oom'>OOM</span></td><td class='n'>3,961 <small>(weights only: allocation failed)</small></td><td class='n'>85.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T052546_c131072_f16.stderr.txt</small></td></tr>
+<tr><td>OLMoE-1B-7B-Instruct (Q4_K_M, MoE)</td><td class='n'>131,072</td><td>q8_0</td><td><span class='chip oom'>OOM</span></td><td class='n'>3,961 <small>(weights only: allocation failed)</small></td><td class='n'>6,156.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T052632_c131072_q8_0.stderr.txt</small></td></tr>
+<tr><td>MiniCPM3-4B (Q4_K_M, MLA)</td><td class='n'>4,096</td><td>f16</td><td><span class='chip fits'>fits</span></td><td class='n'>5,617</td><td class='n'>150.2</td><td class='n'>127.63</td><td class='n'>1.69</td><td><small>run_20261114T052646_c4096_f16.stderr.txt</small></td></tr>
+<tr><td>MiniCPM3-4B (Q4_K_M, MLA)</td><td class='n'>4,096</td><td>q8_0</td><td><span class='chip fits'>fits</span></td><td class='n'>4,164</td><td class='n'>128.2</td><td class='n'>21.18</td><td class='n'>2.44</td><td><small>run_20261114T052732_c4096_q8_0.stderr.txt</small></td></tr>
+<tr><td>MiniCPM3-4B (Q4_K_M, MLA)</td><td class='n'>32,768</td><td>f16</td><td><span class='chip oom'>OOM</span></td><td class='n'>2,354 <small>(weights only: allocation failed)</small></td><td class='n'>76.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T053044_c32768_f16.stderr.txt</small></td></tr>
+<tr><td>MiniCPM3-4B (Q4_K_M, MLA)</td><td class='n'>32,768</td><td>q8_0</td><td><span class='chip oom'>OOM</span></td><td class='n'>2,354 <small>(weights only: allocation failed)</small></td><td class='n'>2,636.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T053058_c32768_q8_0.stderr.txt</small></td></tr>
+<tr><td>MiniCPM3-4B (Q4_K_M, MLA)</td><td class='n'>131,072</td><td>f16</td><td><span class='chip oom'>OOM</span></td><td class='n'>2,354 <small>(weights only: allocation failed)</small></td><td class='n'>76.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T053108_c131072_f16.stderr.txt</small></td></tr>
+<tr><td>MiniCPM3-4B (Q4_K_M, MLA)</td><td class='n'>131,072</td><td>q8_0</td><td><span class='chip oom'>OOM</span></td><td class='n'>2,354 <small>(weights only: allocation failed)</small></td><td class='n'>74.2</td><td class='n'>—</td><td class='n'>—</td><td><small>run_20261114T053116_c131072_q8_0.stderr.txt</small></td></tr>
+</tbody></table></div>
+<p><small>In OOM rows the buffer figure is what had been allocated when the allocation failed (the weights), not the size that was asked for. Phi-3-mini-4k was trained for a 4,096-token window: its 32,768 and 131,072 rows measure memory only, not answer quality.</small></p>
+
+<h2>Control: the same prompt, two window sizes</h2>
+<p class="lede">The 30-cell table compares different prompts. To separate the effect of the window, one model (Phi-3-mini, q8_0 KV) read the <b>same 3,401-token prompt</b> with <code>-c 4096</code> and with <code>-c 32768</code>, three runs each, interleaved.</p>
+<div class="scroll"><table>
+<thead><tr><th>Window</th><th>Run</th><th>Prompt tok/s</th><th>Gen tok/s</th><th>Shared peak (MiB)</th><th>Wall (s)</th></tr></thead>
+<tbody>
+<tr><td class='n'>4,096</td><td class='n'>1</td><td class='n'>344.16</td><td class='n'>2.40</td><td class='n'>108.2</td><td class='n'>87.5</td></tr>
+<tr><td class='n'>4,096</td><td class='n'>2</td><td class='n'>1,170.66</td><td class='n'>16.15</td><td class='n'>108.2</td><td class='n'>9.1</td></tr>
+<tr><td class='n'>4,096</td><td class='n'>3</td><td class='n'>1,269.76</td><td class='n'>17.64</td><td class='n'>108.2</td><td class='n'>7.9</td></tr>
+<tr><td class='n'>32,768</td><td class='n'>1</td><td class='n'>126.66</td><td class='n'>1.73</td><td class='n'>3,518.2</td><td class='n'>58.4</td></tr>
+<tr><td class='n'>32,768</td><td class='n'>2</td><td class='n'>127.99</td><td class='n'>1.70</td><td class='n'>3,518.2</td><td class='n'>39.6</td></tr>
+<tr><td class='n'>32,768</td><td class='n'>3</td><td class='n'>127.50</td><td class='n'>1.73</td><td class='n'>3,522.6</td><td class='n'>45.4</td></tr>
+</tbody></table></div>
+<div class="scroll" style="margin-top:12px"><table>
+<thead><tr><th>Window</th><th>Statistic</th><th>Prompt tok/s</th><th>Range</th></tr></thead>
+<tbody>
+<tr><td class='n'>4,096</td><td>median</td><td class='n'>1,170.66</td><td>344.16 to 1,269.76</td></tr><tr><td class='n'>32,768</td><td>median</td><td class='n'>127.50</td><td>126.66 to 127.99</td></tr>
+</tbody></table></div>
+<p>Median prompt speed fell from 1,170.66 to 127.50 tokens per second, a factor of <b>9.18</b>, with no error or out-of-memory line in any of the six logs (every log has two warnings about token types in the model file, and the 32,768 logs add two warnings that the model was trained on a shorter window, so this is "no memory error", not "no warnings"). <b>What this does not show:</b> the 32,768 window is also the one whose buffers (9,202.84 MiB) exceed the card, so window size and spill are not separated on this card. Say "a larger window, which spills", not "the spill alone costs 9x".</p>
+
+<h2>Worth a look, not explained</h2>
+<ul>
+<li>MiniCPM3-4B at 4,096 tokens: prompt speed 127.63 tokens/s with an f16 KV cache against 21.18 with q8_0 (repeats: 85.34 to 92.34 and 20.07 to 20.54). No CPU-fallback line in the logs; cause unknown.</li>
+<li>MiniCPM3-4B's KV buffer in this build is 3,100 MiB at 4,096 tokens (f16), while the latent-cache formula for its multi-head-latent attention gives 139.5 MiB. I have not checked how this llama.cpp build stores that model's cache.</li>
+</ul>
+
+<h2>Source sheet</h2>
+<div class="scroll"><table>
+<thead><tr><th>Model</th><th>Architecture (from the model's config.json)</th><th>Weights file</th><th>Bytes</th><th>sha256</th></tr></thead>
+<tbody>
+<tr><td>Phi-3-mini-4k (4-bit)</td><td>32 layers, 32 KV heads, head dim 96 (multi-head)</td><td><a href='https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf'>microsoft/Phi-3-mini-4k-instruct-gguf</a><br><small>Phi-3-mini-4k-instruct-q4.gguf</small></td><td class='n'>2,393,231,072</td><td><small>8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef</small></td></tr>
+<tr><td>Qwen2.5-1.5B-Instruct (Q4_K_M)</td><td>28 layers, 2 KV heads, head dim 128 (gqa)</td><td><a href='https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF'>Qwen/Qwen2.5-1.5B-Instruct-GGUF</a><br><small>qwen2.5-1.5b-instruct-q4_k_m.gguf</small></td><td class='n'>1,117,320,736</td><td><small>6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e</small></td></tr>
+<tr><td>Llama-3.1-8B-Instruct (Q4_K_M)</td><td>32 layers, 8 KV heads, head dim 128 (gqa)</td><td><a href='https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF'>bartowski/Meta-Llama-3.1-8B-Instruct-GGUF</a><br><small>Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf</small></td><td class='n'>4,920,739,232</td><td><small>7b064f5842bf9532c91456deda288a1b672397a54fa729aa665952863033557c</small></td></tr>
+<tr><td>OLMoE-1B-7B-Instruct (Q4_K_M, MoE)</td><td>16 layers, 16 KV heads, head dim 128 (mha)</td><td><a href='https://huggingface.co/allenai/OLMoE-1B-7B-0924-Instruct-GGUF'>allenai/OLMoE-1B-7B-0924-Instruct-GGUF</a><br><small>olmoe-1b-7b-0924-instruct-q4_k_m.gguf</small></td><td class='n'>4,213,512,672</td><td><small>8c310f1435a1222338fd2d3d974975be9cd908180b644bab0c2a94da1ac32f3f</small></td></tr>
+<tr><td>MiniCPM3-4B (Q4_K_M, MLA)</td><td>62 layers, n/a KV heads, head dim n/a (mla)</td><td><a href='https://huggingface.co/openbmb/MiniCPM3-4B-GGUF'>openbmb/MiniCPM3-4B-GGUF</a><br><small>minicpm3-4b-q4_k_m.gguf</small></td><td class='n'>2,469,791,584</td><td><small>64913247e927414ecf47fd3e9ea8e3f0c9acae293f583dfa7e24b8872e20fa4c</small></td></tr>
+</tbody></table></div>
+<ul>
+<li><b>Hardware</b>: NVIDIA GeForce RTX 3050 6GB Laptop GPU, driver 581.95, 6,143 MiB usable of which 5,154 MiB were free before any model loaded; Windows 11; Intel i5-13450HX, 15.7 GB RAM.</li>
+<li><b>Runtime</b>: <a href="https://github.com/ggml-org/llama.cpp/releases/tag/b12340">llama.cpp b12340</a>, Windows CUDA 12.4 build (<code>llama-b12340-bin-win-cuda-12.4-x64.zip</code>), flash attention on, all layers offloaded, <code>-fit off</code>.</li>
+<li><b>Dates</b>: runs on 14 November 2026; this page generated 15 November 2026.</li>
+<li><b>Driver setting</b>: the NVIDIA "CUDA - Sysmem Fallback Policy" was set per program to "Prefer No Sysmem Fallback" and spills still happened. Why is unresolved.</li>
+<li><b>Data</b>: <a href="data.json">data.json</a> holds every cell and the control runs. Per-run llama.cpp logs exist for every row (file names in the table); they are not yet published.</li>
+<li><b>Not measured</b>: memory bandwidth, clocks and temperatures, answer quality, anything on another GPU. One run per cell.</li>
+</ul>
+
+<h2>Reproduce a cell</h2>
+<pre>:: 1. Download llama.cpp b12340 (Windows, CUDA 12.4) and the weights file from the table above.
+:: 2. One cell: 32,768-token window, q8_0 KV cache, allocation only (prompt "Hello")
+llama-completion.exe -m MODEL.gguf -c 32768 -ngl 99 -fa on -ctk q8_0 -ctv q8_0 -no-cnv --no-display-prompt --perf -n 8 -fit off -lv 4 -p "Hello"
+
+:: 3. A fill run: the same flags with -f prompt.txt, where prompt.txt is this sentence
+::    repeated until it is about 90% of the window in tokens (llama-tokenize.exe gives the count):
+::    "The server allocates a key and value tensor for every layer and every token of every active sequence.
+::     When requests arrive the scheduler reserves memory for the weights, the cache and the activations. "
+
+:: 4. Read the result: -lv 4 prints "KV buffer size", "model buffer size" and "compute buffer size" lines; add them up
+::    and compare with the card's total. For spills, watch the Windows counter while it runs:
+typeperf "\GPU Adapter Memory(*)\Dedicated Usage" "\GPU Adapter Memory(*)\Shared Usage" -si 1
+nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits</pre>
+<p><small>The measurement scripts that wrapped these commands (<code>measure.py</code>, <code>matrix.py</code>, <code>control.py</code>) are not yet published.</small></p>
+
+<h2>Get dataset updates</h2>
+<p class="lede">More cards and more models will be added as they are measured. Updates go out by newsletter.</p>
+<a class="cta" href="https://rynaut.substack.com/?utm_source=rynaut_site&utm_medium=page&utm_campaign=kv-6gb" rel="noopener">Get dataset updates</a>
+<footer>Rynaut · <a href="../">KV cache calculator</a> · <a href="../../">More free tools</a> · Measurements are one run per cell on one machine, not a vendor benchmark.</footer>
+</div>
+<script src="../../assets/counter.js" defer></script>
+</body>
+</html>

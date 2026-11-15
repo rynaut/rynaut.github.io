@@ -82,6 +82,7 @@ footer a{color:var(--muted)}
       <label>Vocabulary size (V)<input id="vocab" type="number" min="1" step="1"></label>
     </div>
     <p class="note">Presets are read from each model's published config. Check your model's <code>config.json</code> if you use a variant.</p>
+    <p class="note">Read: <a href="../kv-128k-context/">KV cache at 128K context: formula, worked example and table</a>.</p>
 
     <h2 style="margin-top:14px">Workload</h2>
     <div class="grid">
@@ -165,7 +166,7 @@ for (const [k, p] of Object.entries(PRESETS)) sel.add(new Option(p.name, k));
 
 function applyPreset(k) {
   const p = PRESETS[k]; if (!p || k === "custom") return;
-  for (const key of MODEL_KEYS) $(key).value = p[key];
+  for (const key of MODEL_KEYS) if (key in p) $(key).value = p[key];  // dataset presets carry KV fields only
 }
 function num(id) { const v = parseFloat($(id).value); return Number.isFinite(v) && v >= 0 ? v : 0; }
 function fmt(bytes) { const g = bytes / GiB; return g >= 100 ? g.toFixed(0) : g >= 10 ? g.toFixed(1) : g.toFixed(2); }
@@ -272,9 +273,31 @@ $("share").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(location.href); $("copied").textContent = "Copied."; }
   catch (e) { $("copied").textContent = location.href; }
 });
+const INITIAL_PRESET = new URLSearchParams(location.search).get("preset"); // compute() rewrites the URL
 readUrl();
 window.kvCalc = {compute, setMode};
 compute();
+
+// Dataset presets: KV-cache fields read from each model's own config.json (models.json, built by
+// kv-cache-calculator/tools/build_dataset.py). Only layers / KV heads / head dim are set: weights stay yours.
+fetch("models.json").then(r => (r.ok ? r.json() : null)).then(doc => {
+  if (!doc || !Array.isArray(doc.models)) return;
+  const grp = document.createElement("optgroup");
+  grp.label = "From config.json (KV only: set parameters yourself)";
+  for (const r of doc.models) {
+    if (r.kv_bytes_per_token_fp16 === null || r.attention === "sliding") continue;
+    let layers = r.layers, kvheads = r.kv_heads, headdim = r.head_dim, tag = r.attention;
+    if (r.attention === "mla") { kvheads = 1; headdim = (r.kv_lora_rank + r.qk_rope_head_dim) / 2; tag = "MLA latent"; }
+    if (r.attention === "hybrid") { layers = r.attn_layers; tag = "hybrid, attention layers only"; }
+    if (!Number.isInteger(headdim)) continue;
+    const key = "ds:" + r.id;
+    PRESETS[key] = {name: `${r.id} (${tag})`, layers, kvheads, headdim};
+    grp.appendChild(new Option(PRESETS[key].name, key));
+  }
+  sel.appendChild(grp);
+  const want = INITIAL_PRESET;
+  if (want && want.startsWith("ds:") && PRESETS[want]) { sel.value = want; applyPreset(want); compute(); }
+}).catch(() => {});
 </script>
 <script src="../assets/counter.js" defer></script>
 </body>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How much VRAM does the KV cache need at 128K context?</title>
+<meta name="description" content="KV cache memory at 128K context: formula, worked example and a table for dense and MoE models. Qwen2.5 32B needs 32.0 GiB at FP16, one sequence.">
+<link rel="canonical" href="https://rynaut.github.io/kv-128k-context/">
+<style>
+:root{--bg:#F6F7FB;--panel:#fff;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--teal:#007C8C;color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root{--bg:#0A0E1A;--panel:#121829;--line:#24304d;--text:#E8ECF5;--muted:#9AA6C1;--teal:#00E5FF}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:820px;margin:0 auto;padding:28px 16px 56px}
+.k{font:600 12px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;color:var(--teal);text-transform:uppercase}
+h1{font-size:clamp(26px,5.5vw,36px);line-height:1.15;margin:12px 0}h2{font-size:21px;margin:30px 0 8px}h3{font-size:17px;margin:20px 0 4px}
+code,pre{font-family:ui-monospace,Consolas,monospace}pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto}
+.table{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{border:1px solid var(--line);padding:7px 9px;text-align:left}th{background:var(--panel)}
+.calc{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}select,input{font:15px ui-monospace,Consolas,monospace;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px;min-height:40px;width:100%}
+a{color:var(--teal)}footer{margin-top:36px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How much VRAM does the KV cache need at 128K context?","acceptedAnswer":{"@type":"Answer","text":"It depends on the model's layers, KV heads and head dimension, not its parameter count. At 128K context (131,072 tokens), FP16 cache, one sequence: Llama 3.1 8B (dense, GQA) 16.0 GiB; Qwen2.5 32B (dense, 64 layers, 8 KV heads) 32.0 GiB; Qwen 30B MoE (A3B, 48 layers, 4 KV heads) 12.0 GiB; Llama 3.1 70B (dense, GQA) 40.0 GiB. Each additional concurrent sequence needs its own cache of the same size."}},{"@type":"Question","name":"Why does a 30B MoE model need less KV cache than a 32B dense model?","acceptedAnswer":{"@type":"Answer","text":"KV cache size is 2 x layers x KV heads x head dimension x bytes per element, per token. Qwen 30B MoE (A3B, 48 layers, 4 KV heads) has 48 layers and 4 KV heads, so 98,304 bytes per token and 12.0 GiB at 128K; Qwen2.5 32B (dense, 64 layers, 8 KV heads) has 64 layers and 8 KV heads, so 262,144 bytes per token and 32.0 GiB."}},{"@type":"Question","name":"Does an FP8 KV cache halve the memory?","acceptedAnswer":{"@type":"Answer","text":"By the formula yes: one byte per element instead of two halves the cache (16.0 GiB instead of 32.0 GiB for Qwen2.5 32B (dense, 64 layers, 8 KV heads) at 128K). This page does not measure the effect on output quality."}},{"@type":"Question","name":"What else uses GPU memory besides the KV cache?","acceptedAnswer":{"@type":"Answer","text":"Model weights, activations and framework overhead. This page covers the KV cache only; the free calculator linked below shows the other parts."}}]}</script>
+</head>
+<body>
+<main>
+<div class="k">Rynaut // GPU memory</div>
+<h1>How much VRAM does the KV cache need at 128K context?</h1>
+<p><b>Short answer:</b> it is set by layers, KV heads and head dimension, not by parameter count. At 128K context (131,072 tokens), FP16, one sequence: Llama 3.1 8B 16.0 GiB, Qwen2.5 32B 32.0 GiB, Qwen 30B MoE 12.0 GiB, Llama 3.1 70B 40.0 GiB. Every extra concurrent sequence adds the same amount again.</p>
+
+<h2>Formula</h2>
+<pre>bytes per token = 2 (K and V) x layers x KV heads x head dim x bytes per element
+KV cache        = bytes per token x context tokens x concurrent sequences</pre>
+
+<h2>Worked example: Qwen2.5 32B (dense, 64 layers, 8 KV heads)</h2>
+<pre>2 x 64 x 8 x 128 x 2 = 262,144 bytes per token (256 KiB)
+262,144 x 131,072 tokens = 34,359,738,368 bytes = 32.0 GiB</pre>
+
+<h2>Table: 128K context, one sequence</h2>
+<div class="table"><table>
+<thead><tr><th>Model (preset)</th><th>Layers</th><th>KV heads</th><th>Head dim</th><th>Per token (FP16)</th><th>128K, FP16</th><th>128K, FP8 (1 byte)</th></tr></thead>
+<tbody>
+<tr><td>Llama 3.1 8B (dense, GQA)</td><td>32</td><td>8</td><td>128</td><td>131,072 B (128 KiB)</td><td><b>16.0 GiB</b></td><td>8.0 GiB</td></tr>
+<tr><td>Qwen2.5 32B (dense, 64 layers, 8 KV heads)</td><td>64</td><td>8</td><td>128</td><td>262,144 B (256 KiB)</td><td><b>32.0 GiB</b></td><td>16.0 GiB</td></tr>
+<tr><td>Qwen 30B MoE (A3B, 48 layers, 4 KV heads)</td><td>48</td><td>4</td><td>128</td><td>98,304 B (96 KiB)</td><td><b>12.0 GiB</b></td><td>6.0 GiB</td></tr>
+<tr><td>Llama 3.1 70B (dense, GQA)</td><td>80</td><td>8</td><td>128</td><td>327,680 B (320 KiB)</td><td><b>40.0 GiB</b></td><td>20.0 GiB</td></tr>
+</tbody></table></div>
+<p>Architecture values are the ones used by the presets of the free calculator, taken from published model configs. Check your model's <code>config.json</code>; variants differ. 128K is taken as 131,072 tokens. This is the KV cache only: weights, activations and framework overhead are extra, and sliding-window or latent-attention models use a different formula.</p>
+
+<h2>Try your own numbers</h2>
+<div class="calc" id="calc">
+<label>Model preset<select id="m"></select></label>
+<label>Context (tokens)<input id="ctx" type="number" min="1" step="1" value="131072"></label>
+<label>Concurrent sequences<input id="seq" type="number" min="1" step="1" value="1"></label>
+<label>Bytes per element<select id="b"><option value="2">2 (FP16/BF16)</option><option value="1">1 (FP8)</option></select></label>
+</div>
+<p id="out" aria-live="polite"><b></b></p>
+
+<h2>FAQ</h2>
+<h3>How much VRAM does the KV cache need at 128K context?</h3>
+<p>It depends on the model's layers, KV heads and head dimension, not its parameter count. At 128K context (131,072 tokens), FP16 cache, one sequence: Llama 3.1 8B (dense, GQA) 16.0 GiB; Qwen2.5 32B (dense, 64 layers, 8 KV heads) 32.0 GiB; Qwen 30B MoE (A3B, 48 layers, 4 KV heads) 12.0 GiB; Llama 3.1 70B (dense, GQA) 40.0 GiB. Each additional concurrent sequence needs its own cache of the same size.</p>
+<h3>Why does a 30B MoE model need less KV cache than a 32B dense model?</h3>
+<p>KV cache size is 2 x layers x KV heads x head dimension x bytes per element, per token. Qwen 30B MoE (A3B, 48 layers, 4 KV heads) has 48 layers and 4 KV heads, so 98,304 bytes per token and 12.0 GiB at 128K; Qwen2.5 32B (dense, 64 layers, 8 KV heads) has 64 layers and 8 KV heads, so 262,144 bytes per token and 32.0 GiB.</p>
+<h3>Does an FP8 KV cache halve the memory?</h3>
+<p>By the formula yes: one byte per element instead of two halves the cache (16.0 GiB instead of 32.0 GiB for Qwen2.5 32B (dense, 64 layers, 8 KV heads) at 128K). This page does not measure the effect on output quality.</p>
+<h3>What else uses GPU memory besides the KV cache?</h3>
+<p>Model weights, activations and framework overhead. This page covers the KV cache only; the free calculator linked below shows the other parts.</p>
+
+<p><a href="https://rynaut.github.io/kv/?mode=infer&preset=qwen25-32b&batch=1&tokens=131072&maxctx=131072&utm_source=rynaut_site&utm_medium=page&utm_campaign=kv-128k">Open the full GPU memory calculator</a> (weights, KV cache, activations; runs in your browser, nothing is sent). Source and tests: <a href="https://github.com/rynaut/kv-cache-calculator">github.com/rynaut/kv-cache-calculator</a> (MIT).</p>
+<footer>Rynaut: how AI systems really work underneath. <a href="../">All free tools</a> · <a href="https://www.youtube.com/@ArchitectingAutomation">YouTube</a></footer>
+</main>
+<script src="kv_formula.js"></script>
+<script>
+(function () {
+  var K = window.KVFormula, GiB = K.GiB, m = document.getElementById("m"), ctx = document.getElementById("ctx"), seq = document.getElementById("seq"), b = document.getElementById("b"), out = document.getElementById("out").firstChild;
+  Object.keys(K.MODELS).forEach(function (k) { m.add(new Option(K.MODELS[k].name, k)); });
+  m.value = "qwen25-32b";
+  function run() {
+    try {
+      var bytes = K.kvCacheBytes(K.MODELS[m.value], Number(ctx.value), { sequences: Number(seq.value), bytesPerElem: Number(b.value) });
+      out.textContent = "KV cache: " + (bytes / GiB).toFixed(1) + " GiB (" + K.kvBytesPerToken(K.MODELS[m.value], Number(b.value)) / K.KiB + " KiB per token).";
+    } catch (e) { out.textContent = "Enter whole numbers of 1 or more."; }
+  }
+  [m, ctx, seq, b].forEach(function (el) { el.addEventListener("input", run); }); run();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Rynaut tools
+
+> Free browser tools about how AI systems work underneath: GPU memory and KV cache, LLM token bills, and AI agent boundaries. Everything runs in the browser; nothing is stored or sent. Not a certification or audit.
+
+## Pages
+- [How much VRAM does the KV cache need at 128K context?](https://rynaut.github.io/kv-128k-context/): formula, worked example (Qwen2.5 32B = 32.0 GiB at FP16, one sequence) and a table for dense and MoE presets.
+- [GPU Memory Calculator](https://rynaut.github.io/kv/): weights, KV cache, gradients, optimizer states and activations for LLM inference and training.
+- [LLM Token Bill Estimator](https://rynaut.github.io/tokens/): monthly LLM API bill and what retries, context trimming, prompt caching and a smaller model change.
+- [AI Agent Boundary Quick Check](https://rynaut.github.io/quick-check/): 10 yes/no questions on production boundaries for AI agents.
+- [MCP Server Least-Privilege Check](https://rynaut.github.io/mcp-check/): 8 yes/no checks against the 2026-07-28 MCP spec.
+- [Stale Fact / Memory Drift Tester](https://rynaut.github.io/stale/): shows why vector search can retrieve expired facts.
+
+## Source
+- Formula and tests for the KV cache page: https://github.com/rynaut/kv-cache-calculator (MIT)
+- Video channel: https://www.youtube.com/@ArchitectingAutomation
+- Sitemap: https://rynaut.github.io/sitemap.xml
