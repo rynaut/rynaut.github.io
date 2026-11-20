@@ -299,6 +299,10 @@ fetch("models.json").then(r => (r.ok ? r.json() : null)).then(doc => {
   if (want && want.startsWith("ds:") && PRESETS[want]) { sel.value = want; applyPreset(want); compute(); }
 }).catch(() => {});
 </script>
+<div style="max-width:900px;margin:18px auto;padding:12px 16px;border:2px solid #d4a017;border-radius:8px;font-family:inherit">
+<b>Calculated is not measured.</b> See what really fits, spills or runs out of memory on a real 6 GB GPU:
+<a href="measured-6gb/?utm_source=rynaut_site&amp;utm_medium=kv&amp;utm_campaign=measured" onclick="window.rynautCountEvent&amp;&amp;rynautCountEvent('kv-to-measured')">measured results (free)</a> ·
+<a href="https://rynaut.gumroad.com/l/will-it-fit-6gb?utm_source=rynaut_site&amp;utm_medium=kv&amp;utm_campaign=fitpack" rel="noopener" onclick="window.rynautCountEvent&amp;&amp;rynautCountEvent('fitpack-click-kv')">6 GB Fit Pack</a></div>
 <script src="../assets/counter.js" defer></script>
 <script>document.addEventListener("DOMContentLoaded",function(){window.rynautWatchUse&&rynautWatchUse("kv-run");});</script>
 </body>

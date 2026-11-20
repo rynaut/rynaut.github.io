@@ -74,7 +74,7 @@ test("events on but no code: still nothing", () => {
 
 test("the shipped file has no site code until the owner sets one", () => {
   const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "assets", "counter.js"), "utf8");
-  assert.match(src, /var GOATCOUNTER_CODE = "";/);
+  assert.match(src, /var GOATCOUNTER_CODE = "rynaut";/);  // owner set the site code 20 Nov
   assert.match(src, /var EVENTS = true;/);
 });
 

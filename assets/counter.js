@@ -7,7 +7,7 @@
   else if (typeof window !== "undefined") api.init({ code: api.GOATCOUNTER_CODE, events: api.EVENTS, document: document, navigator: navigator, window: window });
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
-  var GOATCOUNTER_CODE = "";   // e.g. "rynaut"  -> https://rynaut.goatcounter.com ; letters, digits and hyphens only
+  var GOATCOUNTER_CODE = "rynaut";   // e.g. "rynaut"  -> https://rynaut.goatcounter.com ; letters, digits and hyphens only
   var EVENTS = true;           // owner decision 15 Nov: count tool runs by name only
 
   function init(env) {
