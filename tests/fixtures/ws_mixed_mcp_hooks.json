@@ -1,0 +1,4 @@
+{
+  "mcpServers": { "notes": { "command": "npx", "args": ["-y", "notes-mcp"] } },
+  "hooks": { "PostToolUse": [ { "hooks": [ { "type": "command", "command": "./scripts/after.sh" } ] } ] }
+}

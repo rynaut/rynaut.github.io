@@ -166,6 +166,69 @@
     }
   }
 
+  // ---- workspace settings: commands that run when a folder opens or a tool runs (T106 / T90, 20 Nov 2026) -----------
+  // Pattern detection only. Nothing is fetched or run, and no file is called safe. Severity is "review", never "malicious".
+  var WS_DETAIL = "This settings file can run commands when the folder opens or a tool runs. Read every command before opening the repo in Claude Code or VS Code.";
+  var VSC_ARGS_KEY = /^terminal\.integrated\..*Args(\.|$)/;
+  var VSC_PATH_KEY = /(\.executablePath|\.path)$/;
+
+  function collectHookCommands(node, path, out) {
+    if (Array.isArray(node)) { node.forEach(function (v, i) { collectHookCommands(v, path + "[" + i + "]", out); }); return; }
+    if (!isObj(node)) return;
+    Object.keys(node).forEach(function (k) {
+      var v = node[k], p = path ? path + "." + k : k;
+      if (k === "command" && typeof v === "string") out.push({ where: p, text: v });
+      else if (v && typeof v === "object") collectHookCommands(v, p, out);
+    });
+  }
+
+  function showArgs(a) { return Array.isArray(a) ? a.map(String).join(" ") : (a === undefined ? "" : String(a)); }
+
+  function checkWorkspace(doc, findings) {
+    var cmds = [], where = [], found = false;
+    if (isObj(doc.hooks)) {
+      var hc = [];
+      collectHookCommands(doc.hooks, "hooks", hc);
+      hc.forEach(function (c) { cmds.push(c.text); where.push(c.where); });
+    }
+    if (Array.isArray(doc.tasks)) {
+      doc.tasks.forEach(function (t, i) {
+        if (!isObj(t)) return;
+        var on = (isObj(t.runOptions) && t.runOptions.runOn) || t.runOn;
+        if (on === "folderOpen") {
+          cmds.push((String(t.command || "") + " " + showArgs(t.args)).trim());
+          where.push("tasks[" + i + "] (runOn folderOpen)");
+        }
+      });
+    }
+    if (isObj(doc)) Object.keys(doc).forEach(function (k) {
+      var v = doc[k];
+      if (/^terminal\.integrated\.profiles\./.test(k) && isObj(v)) {
+        Object.keys(v).forEach(function (n) {
+          var prof = v[n]; if (!isObj(prof)) return;
+          if (prof.path !== undefined) { cmds.push(k + "." + n + ".path = " + showArgs(prof.path)); where.push(k + "." + n + ".path"); }
+          if (prof.args !== undefined) { cmds.push(k + "." + n + ".args = " + showArgs(prof.args)); where.push(k + "." + n + ".args"); }
+        });
+      } else if (VSC_ARGS_KEY.test(k) || VSC_PATH_KEY.test(k)) {
+        cmds.push(k + " = " + (typeof v === "string" ? v : showArgs(v))); where.push(k);
+      }
+    });
+    if (cmds.length) {
+      found = true;
+      add(findings, "workspace-commands", "review", where.join(", "), WS_DETAIL,
+        "Open the file in a text editor and read each command listed here. Remove any you did not write or do not understand before opening the folder in Claude Code or VS Code.",
+        { commands: cmds, limits: "Pattern detection in the browser; no repository is fetched, and a file with no finding has only not matched these patterns." });
+    }
+    if (doc.disableAllHooks === true) {
+      found = true;
+      add(findings, "hooks-disabled", "review", "disableAllHooks",
+        "This file sets disableAllHooks to true. Under Claude Code's documented settings precedence, project settings (.claude/settings.json) take precedence over your user settings, so in this repo it switches off the hooks you configured yourself (user, project, local and plugin hooks), including any guard hooks you rely on. Hooks set in managed settings can only be disabled from the managed level. This is documented precedence, not a bug.",
+        "If you did not write this line, ask why the repo needs it, and do not rely on your own hooks inside this repo until you have read the whole file.",
+        { source: "https://code.claude.com/docs/en/hooks" });
+    } else if (doc.disableAllHooks !== undefined) { found = true; }
+    return found;
+  }
+
   // ---- entry --------------------------------------------------------------------------------
   function audit(text) {
     var res = { shape: "unknown", findings: [], method: METHOD };
@@ -192,6 +255,7 @@
       });
     }
     if (servers || hasApprovals) { if (shapes.indexOf("mcp-config") === -1) shapes.push("settings"); walkApprovals(doc, "", res.findings); }
+    if (isObj(doc) && checkWorkspace(doc, res.findings)) shapes.push("workspace-settings");
     if (shapes.length) res.shape = shapes.join("+");
     return res;
   }

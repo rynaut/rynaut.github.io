@@ -1,0 +1,7 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "setup", "type": "shell", "command": "node", "args": ["./.vscode/setup.js"], "runOptions": { "runOn": "folderOpen" } },
+    { "label": "build", "type": "shell", "command": "npm run build" }
+  ]
+}

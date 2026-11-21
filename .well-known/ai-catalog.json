@@ -1,0 +1,86 @@
+{
+  "entries": [
+    {
+      "identifier": "urn:air:rynaut.github.io:dataset:kv-models",
+      "displayName": "KV-cache size per model (derived from config.json)",
+      "type": "application/json",
+      "url": "https://rynaut.github.io/kv/models.json",
+      "description": "Per-model KV-cache bytes per token derived from each open model's published config.json, with the source commit. Rows where the config does not say which layers hold a KV cache are left blank.",
+      "representativeQueries": [
+        "how much KV cache memory does Llama 3.1 8B need per token",
+        "KV cache bytes per token for open models",
+        "which open models have the smallest KV cache"
+      ],
+      "capabilities": ["KvCacheSizeLookup"],
+      "tags": ["kv-cache", "vram", "llm-inference", "dataset"]
+    },
+    {
+      "identifier": "urn:air:rynaut.github.io:tool:kv-calculator",
+      "displayName": "KV Cache and GPU Memory Calculator",
+      "type": "text/html",
+      "url": "https://rynaut.github.io/kv/",
+      "description": "Browser-only calculator: weights, KV cache, gradients, optimizer states and activations for LLM inference and training against a GPU's memory. Input stays in the browser.",
+      "representativeQueries": [
+        "will this model fit in my GPU memory",
+        "KV cache VRAM calculator for 32K context",
+        "how much VRAM does a 70B model need for inference"
+      ],
+      "capabilities": ["VramEstimate"],
+      "tags": ["kv-cache", "vram", "calculator"]
+    },
+    {
+      "identifier": "urn:air:rynaut.github.io:dataset:measured-6gb",
+      "displayName": "Measured: what fits on a 6 GB GPU",
+      "type": "text/html",
+      "url": "https://rynaut.github.io/kv/measured-6gb/",
+      "description": "Measured llama.cpp runs on one RTX 3050 6 GB laptop GPU: 5 local models, 4K, 32K and 128K windows, f16 and q8_0 KV cache. Each cell is marked fits, spills or out of memory, with the memory the log reported.",
+      "representativeQueries": [
+        "what local LLM fits on a 6GB GPU",
+        "does Llama 3.1 8B run at 32K context on 6GB VRAM",
+        "measured llama.cpp memory use at 128K context"
+      ],
+      "capabilities": ["MeasuredFitLookup"],
+      "tags": ["local-llm", "vram", "llama.cpp", "measured"]
+    },
+    {
+      "identifier": "urn:air:rynaut.github.io:tool:mcp-check",
+      "displayName": "MCP Server Least-Privilege Check",
+      "type": "text/html",
+      "url": "https://rynaut.github.io/mcp-check/",
+      "description": "Paste an MCP config, settings file or tool list: flags wildcard approvals, unpinned packages and read, write and network tool combinations. Pattern matching in the browser; nothing is fetched, run or uploaded.",
+      "representativeQueries": [
+        "check my MCP config for wildcard approvals",
+        "are my MCP server packages pinned",
+        "audit MCP tool permissions least privilege"
+      ],
+      "capabilities": ["McpConfigCheck"],
+      "tags": ["mcp", "least-privilege", "agent-security"]
+    },
+    {
+      "identifier": "urn:air:rynaut.github.io:tool:token-bill",
+      "displayName": "LLM Token Bill Estimator",
+      "type": "text/html",
+      "url": "https://rynaut.github.io/tokens/",
+      "description": "Monthly LLM API bill and what retries, context trimming, prompt caching and a smaller model change.",
+      "representativeQueries": [
+        "estimate my monthly LLM API bill",
+        "how much does prompt caching save on tokens",
+        "cost of retries in an LLM agent"
+      ],
+      "capabilities": ["TokenBillEstimate"],
+      "tags": ["llm-cost", "tokens", "calculator"]
+    },
+    {
+      "identifier": "urn:air:rynaut.github.io:doc:llms-txt",
+      "displayName": "llms.txt",
+      "type": "text/plain",
+      "url": "https://rynaut.github.io/llms.txt",
+      "description": "Plain-text index of the Rynaut tools and datasets for language models.",
+      "representativeQueries": [
+        "list of free browser tools about LLM memory and agent boundaries",
+        "Rynaut tools index"
+      ],
+      "tags": ["index"]
+    }
+  ]
+}

@@ -86,6 +86,10 @@ button{font:inherit;background:none;color:var(--text);border:1px solid var(--lin
 #pasteOut{margin-top:12px}
 #pasteOut .f{border-left:3px solid var(--no);padding:6px 0 6px 12px;margin:0 0 10px}
 #pasteOut .f.medium{border-left-color:var(--gold)}
+#pasteOut .f.review{border-left-color:var(--teal)}
+#pasteOut pre.cmds{margin:6px 0 0;padding:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font:12.5px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all;color:var(--text)}
+.card{margin-top:14px;border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:10px;padding:12px 14px;background:var(--bg);font-size:14px;color:var(--muted)}
+.card b{color:var(--text)}
 #pasteOut .tag{font:600 12px/1 ui-monospace,Consolas,monospace;border:1px solid currentColor;border-radius:5px;padding:3px 5px;margin-right:6px;color:var(--gold)}
 #pasteOut .w{font:13px ui-monospace,Consolas,monospace;color:var(--muted)}
 #pasteOut .ok{color:var(--teal);font-weight:600}
@@ -130,11 +134,12 @@ footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid va
   </section>
   <section class="paste" id="paste" aria-labelledby="pasteH">
     <h2 id="pasteH">Or paste your config</h2>
-    <p>Paste a <code>.mcp.json</code>, a Claude settings file, or a <code>tools/list</code> response. Your config never leaves your browser. The page counts visits and runs, with no cookies. The check itself runs in this page and executes nothing. It checks three things: wildcard approvals, <b>unpinned</b> packages and registry namespaces (no exact version or hash written in the paste), and read + write + network tool combinations. The tool check is a <b>keyword heuristic</b> on names and descriptions, so treat it as a prompt to look, not a verdict.</p>
+    <p>Paste a <code>.mcp.json</code>, a Claude settings file, or a <code>tools/list</code> response. Your config never leaves your browser. The page counts visits and runs, with no cookies. The check itself runs in this page and executes nothing. It checks four things: wildcard approvals, <b>unpinned</b> packages and registry namespaces (no exact version or hash written in the paste), read + write + network tool combinations, and settings files that can run commands (<code>hooks</code>, folder-open tasks, <code>disableAllHooks</code>), which are shown as <b>Review</b> items. The tool check is a <b>keyword heuristic</b> on names and descriptions, so treat it as a prompt to look, not a verdict.</p>
     <label for="pasteIn" style="font-weight:600;font-size:14px">Config or tools/list JSON</label>
     <textarea id="pasteIn" spellcheck="false" autocomplete="off" placeholder='{"mcpServers": {"fs": {"command": "npx", "args": ["-y", "some-mcp-server"]}}}'></textarea>
     <div class="actions"><button type="button" id="pasteGo">Check pasted config</button><button type="button" id="pasteClear">Clear</button></div>
     <div id="pasteOut" aria-live="polite"></div>
+    <div class="card" id="ws-card"><b>Before you open a cloned repo:</b> read its <code>.claude/settings.json</code> and <code>.vscode/settings.json</code>. In Claude Code, <code>hooks</code> in a project's settings run shell commands when their event fires (<a href="https://code.claude.com/docs/en/hooks" rel="noopener noreferrer">hooks reference</a>), and VS Code tasks can be set to run when a folder opens (<code>runOptions.runOn: "folderOpen"</code>). OX Security reported in August 2026 that a registry entry pointed to a clean package whose linked GitHub repository carried its payload in those two files, so opening the repository in Claude Code or VS Code was enough (<a href="https://www.ox.security/blog/shai-hulud-outbreak-debrief-the-worm-evolves-into-mcp/" rel="noopener noreferrer">OX Security debrief</a>; a single vendor's account). Paste either file above and every command it would run is listed word for word. Pattern matching only: a file with no finding has not been shown to be harmless.</div>
   </section>
 </main>
 
@@ -162,13 +167,15 @@ footer{margin-top:34px;color:var(--muted);font-size:14px;border-top:1px solid va
     if (r.error) { out.appendChild(line("err", r.error)); return; }
     if (r.shape === "unknown") { out.appendChild(line("w", "No MCP servers, approvals or tools found in that JSON, so nothing was checked.")); return; }
     out.appendChild(line("w", "Recognised: " + r.shape + ". Method: " + r.method + "."));
-    if (!r.findings.length) { out.appendChild(line("ok", "No findings from these three checks. That does not make the servers safe.")); return; }
+    if (!r.findings.length) { out.appendChild(line("ok", "No findings from these checks. That does not make the servers safe.")); return; }
     r.findings.forEach(function (f) {
       var d = line("f " + f.severity, "");
       var tag = document.createElement("span"); tag.className = "tag"; tag.textContent = f.rule; d.appendChild(tag);
       var w = document.createElement("span"); w.className = "w"; w.textContent = f.where; d.appendChild(w);
       var p1 = document.createElement("div"); p1.textContent = f.detail; d.appendChild(p1);
+      if (f.commands && f.commands.length) { var pre = document.createElement("pre"); pre.className = "cmds"; pre.textContent = f.commands.join("\n"); d.appendChild(pre); }
       var p2 = document.createElement("div"); p2.style.color = "var(--muted)"; p2.textContent = "Fix: " + f.fix; d.appendChild(p2);
+      if (f.limits) { var p4 = document.createElement("div"); p4.style.cssText = "color:var(--muted);font-size:13px"; p4.textContent = f.limits; d.appendChild(p4); }
       if (f.advisory && f.advisory.indexOf("https://github.com/") === 0) { var p3 = document.createElement("div"); var al = document.createElement("a"); al.href = f.advisory; al.rel = "noopener noreferrer"; al.textContent = "Advisory " + f.advisoryId; p3.appendChild(al); d.appendChild(p3); }
       out.appendChild(d);
     });
@@ -302,5 +309,6 @@ render();
 </script>
 <script src="../assets/counter.js" defer></script>
 <script>document.addEventListener("DOMContentLoaded",function(){window.rynautWatchUse&&rynautWatchUse("mcp-check-run");var g=document.getElementById("pasteGo");if(g)g.addEventListener("click",function(){window.rynautCountEvent&&rynautCountEvent("mcp-check-paste-check")});});</script>
+<p id="privacy-line" style="max-width:760px;margin:22px auto 28px;padding:0 16px;font-size:13px;line-height:1.5;opacity:.75;text-align:center">Privacy: this page runs in your browser and your inputs are never sent anywhere. It counts visits and tool runs by name only: no cookies, no fingerprinting, no sensor or location reads, and nothing is counted if your browser sends Do Not Track.</p>
 </body>
 </html>

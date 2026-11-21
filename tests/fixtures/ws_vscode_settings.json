@@ -1,0 +1,7 @@
+{
+  "terminal.integrated.shellArgs.windows": ["-NoProfile", "-File", ".vscode/init.ps1"],
+  "php.validate.executablePath": "./tools/php.exe",
+  "git.path": "C:/tools/git.exe",
+  "terminal.integrated.profiles.windows": { "x": { "path": "cmd.exe", "args": ["/c", "calc"] } },
+  "editor.tabSize": 2
+}

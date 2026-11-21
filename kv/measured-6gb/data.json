@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-15",
+ "generated": "2026-11-21",
  "draft": true,
  "cells": [
   {
@@ -426,6 +426,7 @@
  "control": {
   "prompt_tokens": 3401,
   "4096": {
+   "runs": 5,
    "prompt_tok_s": {
     "median": 1170.66,
     "min": 344.16,
@@ -434,34 +435,34 @@
    "gen_tok_s": {
     "median": 16.15,
     "min": 2.4,
-    "max": 17.64
+    "max": 18.44
    },
    "shared_peak_mib": {
     "median": 108.2,
     "min": 108.2,
-    "max": 108.2
-   },
-   "runs": 3
+    "max": 117.5
+   }
   },
   "32768": {
+   "runs": 5,
    "prompt_tok_s": {
-    "median": 127.5,
+    "median": 127.99,
     "min": 126.66,
-    "max": 127.99
+    "max": 136.03
    },
    "gen_tok_s": {
     "median": 1.73,
     "min": 1.7,
-    "max": 1.73
+    "max": 1.81
    },
    "shared_peak_mib": {
-    "median": 3518.2,
+    "median": 3522.6,
     "min": 3518.2,
-    "max": 3522.6
-   },
-   "runs": 3
+    "max": 3527.5
+   }
   },
-  "ratio_of_median_prompt_tok_s": 9.18164705882353
+  "ratio_of_median_prompt_tok_s": 9.146495819985937,
+  "source": "kv-measure/logs/control_2026-11-14.jsonl (5 runs per window; runs 4 and 5 added 15 Nov)"
  },
  "hardware": "NVIDIA GeForce RTX 3050 6GB Laptop GPU, 6,143 MiB usable, driver 581.95, Windows 11, 5,154 MiB free before any load",
  "runtime": "llama.cpp b12340, Windows CUDA 12.4 build, flash attention on, -ngl 99, -fit off",

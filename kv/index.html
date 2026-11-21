@@ -5,66 +5,132 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GPU Memory Calculator</title>
 <meta name="description" content="Where your GPU memory goes: weights, KV cache, gradients, optimizer states and activations for LLM inference and training. Your inputs never leave your browser. The page counts visits and runs, with no cookies.">
+<script>try{var t=localStorage.getItem("mft-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>
-:root{--bg:#0A0E1A;--panel:#121829;--line:#24304d;--text:#E8ECF5;--muted:#9AA6C1;--gold:#F5C842;--teal:#00E5FF;--bad:#FF7A6B;--ok:#55D69A;
---c1:#00E5FF;--c2:#F5C842;--c3:#B48CFF;--c4:#FF9F5A;--c5:#55D69A;--c6:#9AA6C1;color-scheme:dark}
-@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--bad:#B3261E;--ok:#1B7F4E;
---c1:#007C8C;--c2:#9A7400;--c3:#6B44C9;--c4:#B85A12;--c5:#1B7F4E;--c6:#55607A;color-scheme:light}}
-:root[data-theme="light"]{--bg:#F6F7FB;--panel:#FFFFFF;--line:#D9DEEA;--text:#0E1424;--muted:#55607A;--gold:#9A7400;--teal:#007C8C;--bad:#B3261E;--ok:#1B7F4E;
---c1:#007C8C;--c2:#9A7400;--c3:#6B44C9;--c4:#B85A12;--c5:#1B7F4E;--c6:#55607A;color-scheme:light}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:860px;margin:0 auto;padding:24px 16px 48px}
-.kicker{font:600 12px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;color:var(--teal);text-transform:uppercase}
-h1{font-size:clamp(26px,6vw,38px);line-height:1.15;margin:10px 0 8px}
-h2{font-size:18px;margin:0 0 10px}
-.lede{color:var(--muted);margin:0 0 18px}
-.tabs{display:flex;gap:8px;margin:0 0 14px}
-.tabs button{flex:1}
-.tabs button[aria-selected="true"]{border-color:var(--teal);color:var(--teal);font-weight:700}
-.panel{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px;margin:0 0 12px}
+:root{--bg:#F3F3F0;--panel:#FBFBF9;--ink:#0B0B0C;--ink2:#46464A;--mute:#86868B;--line:#D9D9D4;--soft:#E7E7E2;--em:#047857;--embg:#E3F2EC;--emink:#FFFFFF;--hatch:#0B0B0C;--warn:#9A5B00;--c1:#047857;--c2:#0B0B0C;--c3:#6B6B70;--c4:#B7B7B0;--c5:#2F9E7A;--c6:#D9D9D4;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0B0B0C;--panel:#121214;--ink:#F2F2EF;--ink2:#B4B4B0;--mute:#77777B;--line:#2A2A2D;--soft:#1C1C1F;--em:#34D399;--embg:#0F2A21;--emink:#052E21;--hatch:#F2F2EF;--warn:#FBBF24;--c1:#34D399;--c2:#F2F2EF;--c3:#9A9AA0;--c4:#4A4A4F;--c5:#1F7A5C;--c6:#2A2A2D;color-scheme:dark}}
+:root[data-theme=dark]{--bg:#0B0B0C;--panel:#121214;--ink:#F2F2EF;--ink2:#B4B4B0;--mute:#77777B;--line:#2A2A2D;--soft:#1C1C1F;--em:#34D399;--embg:#0F2A21;--emink:#052E21;--hatch:#F2F2EF;--warn:#FBBF24;--c1:#34D399;--c2:#F2F2EF;--c3:#9A9AA0;--c4:#4A4A4F;--c5:#1F7A5C;--c6:#2A2A2D;color-scheme:dark}
+:root[data-theme=light]{color-scheme:light}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.mono,.need,.stat b,dd,.mrow,td.n,#total{font-family:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+a{color:inherit}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.3px;font-size:15px;margin-right:auto;text-decoration:none;color:var(--ink)}
+.logo{width:28px;height:28px;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:900;font-size:14px;border-radius:4px}
+.logo b{display:block;width:6px;height:6px;background:var(--em);position:relative;left:6px;top:-6px;border-radius:1px}
+.grp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lbl{font-size:10.5px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.09em}
+.rail{position:relative;display:inline-flex;border:1px solid var(--ink);border-radius:4px;padding:2px;background:var(--panel);gap:2px}
+.rail button{border:0;background:transparent;color:var(--ink2);font:700 12px/1 ui-monospace,"Cascadia Mono",Consolas,monospace;padding:9px 12px;min-height:34px;cursor:pointer;white-space:nowrap;border-radius:2px}
+.rail button[aria-pressed=true],.rail button[aria-selected=true]{background:var(--ink);color:var(--bg)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,.tile:focus-visible{outline:2px solid var(--em);outline-offset:2px}
+main,.wrap{max-width:1100px;margin:0 auto;padding:26px 16px 40px}
+.kick{font:700 11px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--em);margin:0 0 10px}
+h1{font-size:clamp(28px,4vw,44px);letter-spacing:-1.5px;line-height:1.04;margin:0 0 10px;font-weight:850;max-width:20ch}
+h1 em{font-style:normal;color:var(--em)}
+h2{font-size:20px;letter-spacing:-.4px;margin:30px 0 8px}
+.panel h2{margin-top:0;font-size:16px}
+.sub,.lede{color:var(--ink2);margin:0 0 16px;max-width:760px}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:4px;padding:6px 10px;font:600 12px inherit;cursor:pointer;min-height:32px;text-decoration:none}
+.chip:hover{border-color:var(--ink);color:var(--ink)}
+.chip[aria-pressed=true]{border-color:var(--ink);background:var(--ink);color:var(--bg)}
+.panel{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:16px;margin:0 0 12px}
+.panel.cta{border:1.5px solid var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--ink);border-radius:4px;margin:0 0 16px;background:var(--panel)}
+.stat{padding:12px 14px;border-left:1px solid var(--line)}.stat:first-child{border-left:0}
+.stat b{display:block;font-size:26px;letter-spacing:-1px;line-height:1.1}.stat span{font-size:11.5px;color:var(--mute);font-weight:600}
+.stat.f b{color:var(--em)}.stat.n b{text-decoration:line-through;text-decoration-thickness:2px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px}
-label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
-input,select{font:15px/1.2 ui-monospace,Consolas,monospace;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:40px;width:100%}
-input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
-button{font:inherit;background:none;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:40px}
-.total{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-#total{font:700 clamp(32px,8vw,44px)/1 ui-monospace,Consolas,monospace;color:var(--gold)}
-#verdict{font-weight:700}
-#verdict.ok{color:var(--ok)}#verdict.bad{color:var(--bad)}
-.bar{display:flex;height:22px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin:12px 0 4px;background:var(--bg);position:relative}
-.bar span{display:block;height:100%}
-.cap{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--text)}
-table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
-td{padding:6px 4px;border-top:1px solid var(--line)}
-td.n{text-align:right;font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
-.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:middle}
-.formula{font:13px/1.5 ui-monospace,Consolas,monospace;color:var(--muted);overflow-wrap:anywhere}
-.note{color:var(--muted);font-size:13px}
-.cta{border:2px solid var(--gold)}
-a.btn{display:inline-block;margin:6px 8px 0 0;background:var(--gold);color:#0A0E1A;font-weight:700;text-decoration:none;padding:10px 16px;border-radius:8px}
-a.ghost{background:none;color:var(--text);border:1px solid var(--line)}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute);font-weight:600}
+input,select{font:14px/1.2 ui-monospace,"Cascadia Mono",Consolas,monospace;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:9px 10px;min-height:38px;width:100%}
+button{font:inherit}
+.btn,a.btn{display:inline-flex;align-items:center;margin:6px 8px 0 0;background:var(--ink);color:var(--bg);font-weight:800;text-decoration:none;padding:10px 16px;border-radius:4px;border:0;min-height:38px;cursor:pointer}
+.btn.ghost,a.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.cta-link,a.cta{display:inline-flex;align-items:center;margin-top:10px;padding:11px 18px;border-radius:4px;background:var(--em);color:var(--emink);font-weight:800;text-decoration:none}
+.tile{position:relative;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:4px;padding:9px 10px 10px;min-height:96px;cursor:pointer;font:inherit;transition:transform .18s,border-color .18s}
+.tile:hover{transform:translateY(-2px);border-color:var(--ink)}
+.tile .gl{position:absolute;right:8px;top:7px;width:20px;height:20px;display:grid;place-items:center;font:800 12px/1 ui-monospace,Consolas,monospace;border-radius:2px}
+.tile .row{display:flex;gap:6px;align-items:center;font:700 10.5px ui-monospace,Consolas,monospace;color:var(--mute)}
+.tile .sym{font-size:22px;font-weight:850;letter-spacing:-1px;line-height:1.05;margin:8px 0 1px}
+.tile .nm{font-size:11px;color:var(--ink2)}
+.tile .need{font-size:11.5px;font-weight:700;margin-top:6px}
+.meter{height:6px;border:1px solid var(--line);margin-top:5px;border-radius:1px;overflow:hidden;background:var(--bg)}.meter span{display:block;height:100%}
+.tile.fits{background:var(--embg);border-color:var(--em)}.tile.fits .gl{background:var(--em);color:var(--emink)}.tile.fits .need,.tile.fits .sym{color:var(--em)}.tile.fits .meter span{background:var(--em)}
+.tile.tight{border:1.5px dashed var(--ink)}.tile.tight .gl{border:1.5px solid var(--ink)}.tile.tight .meter span{background:var(--ink)}
+.tile.no{background-color:var(--soft);color:var(--mute)}.tile.no .sym,.tile.no .nm{color:var(--mute)}.tile.no .gl{background:var(--ink);color:var(--bg)}.tile.no .need{text-decoration:line-through;color:var(--ink2)}
+.tile.no .meter span{background:repeating-linear-gradient(135deg,var(--hatch) 0 2px,transparent 2px 5px)}
+.tile.sel{outline:2px solid var(--em);outline-offset:1px}
+.badge{font:800 9.5px/1 ui-monospace,Consolas,monospace;padding:2px 4px;border-radius:2px;background:var(--ink);color:var(--bg)}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(460px,100%);background:var(--panel);border-left:1.5px solid var(--ink);transform:translateX(105%);transition:transform .26s cubic-bezier(.2,.8,.2,1);z-index:40;overflow:auto;padding:22px;visibility:hidden}
+.drawer.on{transform:none;visibility:visible}
+.close{position:absolute;right:14px;top:14px;border:1px solid var(--ink);background:var(--panel);color:var(--ink);width:36px;height:36px;border-radius:4px;cursor:pointer;font-weight:800}
+.drawer h2{font-size:22px;letter-spacing:-.6px;margin:6px 0 2px;padding-right:44px;word-break:break-word}
+.drawer .org{color:var(--mute);font:600 11.5px ui-monospace,Consolas,monospace}
+.verdict{display:inline-block;margin:12px 0;padding:6px 10px;border-radius:3px;font-weight:800;font-size:12.5px;border:1.5px solid var(--ink)}
+.v-fits{background:var(--em);border-color:var(--em);color:var(--emink)}.v-no{background:var(--ink);color:var(--bg)}.v-tight{border-style:dashed}
+dl{display:grid;grid-template-columns:1fr auto;gap:0;margin:8px 0 14px;font-size:13px;border-top:1px solid var(--line)}dt,dd{padding:7px 0;border-bottom:1px solid var(--line)}dt{color:var(--ink2)}dd{margin:0;font-weight:700;text-align:right;font-size:12.5px}
+.callout{border:1px solid var(--line);border-radius:3px;padding:10px 12px;font-size:13px;margin:10px 0;background:var(--bg)}
+.callout.warn{border:1.5px solid var(--ink);border-left:6px solid var(--em);border-radius:0}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}.scrim.on{opacity:1;pointer-events:auto}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+td.n{text-align:right;white-space:nowrap}
+small,.note{color:var(--mute);font-size:12.5px}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px;overflow-x:auto;font:12.5px/1.5 ui-monospace,Consolas,monospace}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.92em}
 [hidden]{display:none!important}
-footer{margin-top:28px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:12px}
-footer a{color:var(--muted)}
+footer,.foot{margin-top:30px;color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+@media (max-width:760px){.top{position:static}.bar{gap:10px}.drawer{top:auto;bottom:0;height:82%;width:100%;border-left:0;border-top:1.5px solid var(--ink);transform:translateY(105%)}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:nth-child(3){border-left:0}.stat:nth-child(n+3){border-top:1px solid var(--line)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+#total{font-weight:800;font-size:clamp(34px,8vw,52px);line-height:1;letter-spacing:-2px;color:var(--em)}
+.total{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#verdict{display:inline-block;padding:5px 10px;border-radius:3px;font-weight:800;font-size:12.5px;border:1.5px solid var(--ink)}
+#verdict:empty{display:none}
+#verdict.ok{background:var(--em);border-color:var(--em);color:var(--emink)}
+#verdict.bad{background:var(--ink);color:var(--bg)}
+.stack{display:flex;height:34px;border:1.5px solid var(--ink);border-radius:3px;margin:14px 0 6px;background:var(--bg);position:relative}
+.stack span{display:block;height:100%}
+.stack .cap{position:absolute;top:-7px;bottom:-7px;width:0;border-left:2px solid var(--em);background:none}
+.parts{width:100%;border-collapse:collapse;margin-top:6px}
+.parts td{padding:7px 4px;border-top:1px solid var(--line)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:middle;border:1px solid var(--ink)}
+.formula{font:12.5px/1.6 ui-monospace,Consolas,monospace;color:var(--ink2);overflow-wrap:anywhere}
+.badge.preset{background:var(--em);color:var(--emink)}
+.tabs{display:flex;margin:0 0 14px}
+.tabs .rail{width:100%}.tabs .rail button{flex:1}
+#drawer .panel{border:0;padding:0}
 </style>
 </head>
 <body>
+<div class="top"><div class="bar">
+  <a class="brand" href="../"><span class="logo">R<b></b></span>GPU Memory Calculator</a>
+  <nav class="grp" aria-label="Related">
+    <a class="chip" href="table/">Fit table</a>
+    <a class="chip" href="measured-6gb/">Measured on 6 GB</a>
+    <button class="chip" id="theme" type="button" aria-label="Switch light or dark">Light / dark</button>
+  </nav>
+</div></div>
 <main>
-  <div class="kicker">Rynaut // Where the token actually goes</div>
-  <h1>Where does my GPU memory go?</h1>
+  <div class="kick">Rynaut // Where the token actually goes</div>
+  <h1>Where does my <em>GPU memory</em> go?</h1>
   <p class="lede">Estimate the memory an LLM needs on one GPU, part by part, before you hit out-of-memory. Everything is calculated in this page. Your inputs never leave your browser; the page counts visits and runs, with no cookies.</p>
 
-  <div class="tabs" role="tablist">
+  <div class="tabs" role="tablist"><div class="rail">
     <button type="button" role="tab" id="tab-infer" aria-selected="true" data-mode="infer">Inference (serving)</button>
     <button type="button" role="tab" id="tab-train" aria-selected="false" data-mode="train">Training / fine-tuning</button>
-  </div>
+  </div></div>
 
   <section class="panel" aria-live="polite">
-    <div class="total"><span id="total">0</span><span>GiB needed</span><span id="verdict"></span><span id="preset-badge" hidden style="font:600 12px/1 ui-monospace,Consolas,monospace;color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:3px 7px">Loaded from Signal Preset</span></div>
-    <div class="bar" id="bar" aria-hidden="true"></div>
+    <div class="total"><span id="total">0</span><span class="mono">GiB needed</span><span id="verdict"></span><span id="preset-badge" class="badge preset" hidden>Loaded from Signal Preset</span></div>
+    <div class="stack" id="bar" aria-hidden="true"></div>
     <p class="note" id="barnote"></p>
-    <table id="rows"></table>
+    <table id="rows" class="parts"></table>
+    <p class="note" style="margin-top:12px"><button type="button" class="chip" id="how-open">How it's calculated</button> <button type="button" class="chip" id="share">Copy link to these numbers</button> <span id="copied" role="status"></span></p>
   </section>
 
   <form id="f" class="panel" novalidate>
@@ -84,7 +150,7 @@ footer a{color:var(--muted)}
     <p class="note">Presets are read from each model's published config. Check your model's <code>config.json</code> if you use a variant.</p>
     <p class="note">Read: <a href="../kv-128k-context/">KV cache at 128K context: formula, worked example and table</a>.</p>
 
-    <h2 style="margin-top:14px">Workload</h2>
+    <h2 style="margin-top:18px">Workload</h2>
     <div class="grid">
       <label>GPU memory (GiB)<input id="vram" type="number" min="1" step="1" list="vrams"></label>
       <label data-only="infer">Weight precision
@@ -115,30 +181,38 @@ footer a{color:var(--muted)}
     <p class="note">Runtime overhead (framework, kernels, fragmentation) depends on your stack. Measure it with <code>nvidia-smi</code> on an idle loaded model; 0 leaves it out.</p>
   </form>
 
-
   <section class="panel" id="paging" data-only="infer">
     <h2>Why the KV cache can still run out: reserved vs paged</h2>
-    <table id="prows"></table>
+    <table id="prows" class="parts"></table>
     <p class="note">A contiguous allocator reserves the maximum context for every sequence up front. A paged allocator (PagedAttention, Kwon et al., SOSP 2023) hands out fixed-size blocks on demand, so the most a sequence can waste is its last, partly filled block. That paper measured only 20.4–38.2% of KV-cache memory holding real token states in the earlier systems it evaluated; your numbers above are this workload, not that benchmark.</p>
   </section>
 
-  <section class="panel">
-    <h2>How it's calculated</h2>
-    <p class="formula" data-only="infer">weights = params × bytes(weight precision)<br>KV cache = 2 · L · T · H_kv · d_h · bytes(KV) · b &nbsp;(the 2 is one K and one V per token per layer)</p>
-    <p class="formula" data-only="train">weights + gradients + optimizer = params × bytes/param (16 for mixed-precision Adam: 2 weights + 2 gradients + 4 FP32 master copy + 8 Adam moments; Rajbhandari et al., ZeRO, 2020)<br>activations per layer (16-bit) = s · b · h · (34 + 5 · a · s / h); selective = 34 · s · b · h; full = 2 · s · b · h (Korthikanti et al., 2022)<br>logits = s · b · V · 4 bytes (FP32)</p>
-    <p class="note">Estimates for one GPU, no tensor or pipeline parallelism. Real frameworks add temporary buffers, so leave headroom. 1 GiB = 1,073,741,824 bytes.</p>
-  </section>
+  <div class="callout warn">
+<b>Calculated is not measured.</b> See what really fits, spills or runs out of memory on a real 6 GB GPU:
+<a href="measured-6gb/?utm_source=rynaut_site&amp;utm_medium=kv&amp;utm_campaign=measured" onclick="window.rynautCountEvent&amp;&amp;rynautCountEvent('kv-to-measured')">measured results (free)</a> ·
+<a href="https://rynaut.gumroad.com/l/will-it-fit-6gb?utm_source=rynaut_site&amp;utm_medium=kv&amp;utm_campaign=fitpack" rel="noopener" onclick="window.rynautCountEvent&amp;&amp;rynautCountEvent('fitpack-click-kv')">6 GB Fit Pack</a> · <a href="table/">model fit table</a></div>
 
   <section class="panel cta">
     <h2>Watch where the memory goes</h2>
     <p>Season 02 of <b>Where the Token Actually Goes</b> walks one request through the KV cache, the allocator and the bill, with every figure sourced.</p>
     <a class="btn" id="cta-sub" href="https://rynaut.substack.com/subscribe?utm_source=kv_calculator">Get the next episode by email</a>
     <a class="btn ghost" id="cta-yt" href="https://www.youtube.com/@ArchitectingAutomation?sub_confirmation=1">Subscribe on YouTube</a>
-    <p class="note" style="margin-top:10px"><button type="button" id="share">Copy link to these numbers</button> <span id="copied" role="status"></span></p>
   </section>
 
   <footer>RYNAUT · <a href="../">More free tools</a> · <a href="../quick-check/">AI Agent Boundary Quick Check</a> · Vendor-neutral estimate, not a guarantee.</footer>
 </main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="how-h" aria-hidden="true">
+  <button class="close" type="button" id="how-close" aria-label="Close">✕</button>
+  <div class="org">Method</div>
+  <h2 id="how-h">How it's calculated</h2>
+  <section class="panel">
+    <p class="formula" data-only="infer">weights = params × bytes(weight precision)<br>KV cache = 2 · L · T · H_kv · d_h · bytes(KV) · b &nbsp;(the 2 is one K and one V per token per layer)</p>
+    <p class="formula" data-only="train">weights + gradients + optimizer = params × bytes/param (16 for mixed-precision Adam: 2 weights + 2 gradients + 4 FP32 master copy + 8 Adam moments; Rajbhandari et al., ZeRO, 2020)<br>activations per layer (16-bit) = s · b · h · (34 + 5 · a · s / h); selective = 34 · s · b · h; full = 2 · s · b · h (Korthikanti et al., 2022)<br>logits = s · b · V · 4 bytes (FP32)</p>
+    <p class="note">Estimates for one GPU, no tensor or pipeline parallelism. Real frameworks add temporary buffers, so leave headroom. 1 GiB = 1,073,741,824 bytes.</p>
+  </section>
+</aside>
 <script>
 "use strict";
 const PRESETS = {
@@ -299,11 +373,21 @@ fetch("models.json").then(r => (r.ok ? r.json() : null)).then(doc => {
   if (want && want.startsWith("ds:") && PRESETS[want]) { sel.value = want; applyPreset(want); compute(); }
 }).catch(() => {});
 </script>
-<div style="max-width:900px;margin:18px auto;padding:12px 16px;border:2px solid #d4a017;border-radius:8px;font-family:inherit">
-<b>Calculated is not measured.</b> See what really fits, spills or runs out of memory on a real 6 GB GPU:
-<a href="measured-6gb/?utm_source=rynaut_site&amp;utm_medium=kv&amp;utm_campaign=measured" onclick="window.rynautCountEvent&amp;&amp;rynautCountEvent('kv-to-measured')">measured results (free)</a> ·
-<a href="https://rynaut.gumroad.com/l/will-it-fit-6gb?utm_source=rynaut_site&amp;utm_medium=kv&amp;utm_campaign=fitpack" rel="noopener" onclick="window.rynautCountEvent&amp;&amp;rynautCountEvent('fitpack-click-kv')">6 GB Fit Pack</a></div>
+<script>
+(function(){
+  var d=document.getElementById("drawer"),s=document.getElementById("scrim");
+  function openD(){d.classList.add("on");s.classList.add("on");d.setAttribute("aria-hidden","false");document.getElementById("how-close").focus()}
+  function closeD(){d.classList.remove("on");s.classList.remove("on");d.setAttribute("aria-hidden","true");document.getElementById("how-open").focus()}
+  document.getElementById("how-open").addEventListener("click",openD);
+  document.getElementById("how-close").addEventListener("click",closeD);
+  s.addEventListener("click",closeD);
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&d.classList.contains("on"))closeD()});
+  document.getElementById("theme").addEventListener("click",function(){var r=document.documentElement;var dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;r.dataset.theme=dark?"light":"dark";try{localStorage.setItem("mft-theme",r.dataset.theme)}catch(e){}});
+  try{var t=localStorage.getItem("mft-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
+})();
+</script>
 <script src="../assets/counter.js" defer></script>
 <script>document.addEventListener("DOMContentLoaded",function(){window.rynautWatchUse&&rynautWatchUse("kv-run");});</script>
+<p id="privacy-line" style="max-width:760px;margin:22px auto 28px;padding:0 16px;font-size:13px;line-height:1.5;opacity:.75;text-align:center">Privacy: this page runs in your browser and your inputs are never sent anywhere. It counts visits and tool runs by name only: no cookies, no fingerprinting, no sensor or location reads, and nothing is counted if your browser sends Do Not Track.</p>
 </body>
 </html>
