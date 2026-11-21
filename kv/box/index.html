@@ -1,0 +1,151 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VRAM Box</title>
+<meta name="description" content="Watch a local LLM fill your GPU: weights drop in, the KV cache stacks up token by token, and whatever doesn't fit spills to shared memory. Measured on a real 6 GB GPU.">
+<script src="../../assets/counter.js" defer></script>
+<style>
+:root{--bg:#F3F3F0;--panel:#FBFBF9;--ink:#0B0B0C;--ink2:#46464A;--mute:#86868B;--line:#D9D9D4;--soft:#E7E7E2;--em:#047857;--embg:#E3F2EC;--emink:#FFFFFF}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0B0B0C;--panel:#121214;--ink:#F2F2EF;--ink2:#B4B4B0;--mute:#77777B;--line:#2A2A2D;--soft:#1C1C1F;--em:#34D399;--embg:#0F2A21;--emink:#052E21}}
+:root[data-theme=dark]{--bg:#0B0B0C;--panel:#121214;--ink:#F2F2EF;--ink2:#B4B4B0;--mute:#77777B;--line:#2A2A2D;--soft:#1C1C1F;--em:#34D399;--embg:#0F2A21;--emink:#052E21}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.mono,.read b,.ctxv{font-family:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1240px;margin:0 auto;padding:22px 16px 48px}
+.kick{font:700 11px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--em);margin:0 0 10px}
+h1{font-size:clamp(28px,4vw,44px);letter-spacing:-1.5px;line-height:1.03;margin:0 0 8px;font-weight:850;max-width:18ch}h1 em{font-style:normal;color:var(--em)}
+.sub{color:var(--ink2);margin:0 0 18px;max-width:720px}
+.lay{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+.stage{position:relative;border:1.5px solid var(--ink);border-radius:4px;background:var(--panel);height:min(68vh,620px);min-height:380px;overflow:hidden;touch-action:none;cursor:grab}
+.stage canvas{display:block;width:100%;height:100%}
+.tag{position:absolute;font:700 11px ui-monospace,Consolas,monospace;color:var(--mute);pointer-events:none;white-space:nowrap}
+.hint{position:absolute;left:12px;bottom:10px;font:600 11px ui-monospace,Consolas,monospace;color:var(--mute)}
+.side{display:flex;flex-direction:column;gap:12px}
+.card{border:1px solid var(--line);border-radius:4px;background:var(--panel);padding:12px 14px}
+.lbl{display:block;font-size:10.5px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.09em;margin:0 0 6px}
+.rail{position:relative;display:flex;flex-wrap:wrap;border:1px solid var(--ink);border-radius:4px;padding:2px;background:var(--panel)}
+.rail button{flex:1;border:0;background:transparent;color:var(--ink2);font:700 12px/1 ui-monospace,Consolas,monospace;padding:9px 6px;min-height:34px;cursor:pointer;border-radius:2px}
+.rail button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+select{width:100%;border:1px solid var(--ink);border-radius:4px;background:var(--panel);color:var(--ink);font:600 13px inherit;padding:9px 10px;min-height:40px}
+input[type=range]{width:100%;accent-color:var(--em);min-height:32px}
+.ctxv{font-weight:800;font-size:18px}
+button:focus-visible,select:focus-visible,input:focus-visible,[role=switch]:focus-visible{outline:2px solid var(--em);outline-offset:2px}
+.sw{display:flex;align-items:center;gap:10px;min-height:56px;cursor:pointer;border:0;background:transparent;color:var(--ink2);font:600 12.5px inherit;padding:0;text-align:left}
+.sw .trk{position:relative;width:54px;height:28px;border:1.5px solid var(--ink);border-radius:3px;background:var(--panel);flex:none}
+.sw .th{position:absolute;top:3px;left:3px;width:19px;height:19px;background:var(--ink);border-radius:2px;transition:left .32s cubic-bezier(.3,1.5,.5,1)}
+.sw[aria-checked=true] .trk{background:var(--em);border-color:var(--em)}.sw[aria-checked=true] .th{left:30px;background:var(--emink)}
+.verdict{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px}
+.gl{width:30px;height:30px;display:grid;place-items:center;border-radius:3px;font:800 15px ui-monospace,Consolas,monospace}
+.v-fits .gl{background:var(--em);color:var(--emink)}.v-tight .gl{border:1.5px dashed var(--ink)}.v-no .gl{background:var(--ink);color:var(--bg)}
+.read{display:grid;grid-template-columns:1fr auto;margin-top:10px;font-size:13px;border-top:1px solid var(--line)}
+.read span,.read b{padding:6px 0;border-bottom:1px solid var(--line)}.read span{color:var(--ink2)}.read b{text-align:right;font-size:12.5px}
+.note{font-size:12.5px;border:1.5px solid var(--ink);border-left:6px solid var(--em);padding:9px 11px;margin-top:10px;display:none}
+.cta{display:flex;gap:8px;flex-wrap:wrap}.cta a{flex:1;text-align:center;text-decoration:none;font-weight:800;font-size:13px;padding:11px 10px;border-radius:4px;border:1.5px solid var(--ink);color:var(--ink)}
+.cta a.p{background:var(--em);border-color:var(--em);color:var(--emink)}
+.fb{display:none;padding:16px;height:100%;flex-direction:column;justify-content:flex-end;gap:6px}
+.fb .bar{position:relative;height:100%;max-height:420px;width:120px;margin:0 auto;border:1.5px solid var(--ink);display:flex;flex-direction:column-reverse}
+.foot{margin-top:22px;color:var(--mute);font-size:12px;max-width:900px;border-top:1px solid var(--line);padding-top:12px}a{color:inherit}
+@media (max-width:900px){.lay{grid-template-columns:1fr}.stage{height:56vh;min-height:340px}}
+</style></head><body>
+<div class="wrap">
+<p class="kick">Rynaut · VRAM box · measured on a real 6 GB GPU</p>
+<h1>Watch a model <em>fill</em> your GPU.</h1>
+<p class="sub">The box is your usable GPU memory. Weights drop in first. Then the KV cache stacks up as the context grows. Whatever doesn't fit falls into shared system memory, where it runs much slower.</p>
+<div class="lay">
+ <div class="stage" id="stage" aria-label="3D view of GPU memory filling with model weights and KV cache">
+  <div class="fb" id="fb" aria-hidden="true"></div>
+  <span class="hint" id="hint">drag to turn</span>
+ </div>
+ <div class="side">
+  <div class="card"><span class="lbl">Model</span><select id="model" aria-label="Model"></select></div>
+  <div class="card"><span class="lbl">GPU memory</span><div class="rail" id="vram"></div></div>
+  <div class="card"><span class="lbl">Context <span class="ctxv" id="ctxv"></span></span><input type="range" id="ctx" min="0" max="7" step="1" aria-label="Context length"></div>
+  <div class="card"><span class="lbl">KV cache</span><div class="rail" id="kvp"></div><span class="lbl" style="margin-top:10px">Weights</span><div class="rail" id="wq"></div>
+   <button class="sw" id="desk" type="button" role="switch" aria-checked="false"><span class="trk"><span class="th"></span></span>GPU also drives my display (−1 GiB)</button>
+   <button class="sw" id="theme" type="button" role="switch" aria-checked="false"><span class="trk"><span class="th"></span></span>Dark</button></div>
+  <div class="card" aria-live="polite"><div class="verdict" id="verdict"></div>
+   <div class="read" id="read"></div><div class="note" id="note"></div></div>
+  <div class="cta"><a class="p" href="https://rynaut.gumroad.com/l/will-it-fit-6gb?utm_source=site&utm_medium=box&utm_campaign=fitpack">Get the 6 GB Fit Pack</a><a href="../table/">All models</a></div>
+ </div>
+</div>
+<p class="foot">KV bytes per token from each model's config.json at a pinned commit (layers × KV heads × head size × 2 × bytes). Weights are an estimate: parameters × bytes per parameter (Q4 ≈ 0.6, Q8 ≈ 1.07, FP16 = 2). Usable = GPU memory − 0.3 GiB for compute buffers. Where a measured run exists (RTX 3050 Laptop 6 GB, llama.cpp b12340, Q4 GGUF) it is shown next to the formula. Runs in your browser; nothing you pick is sent. By Rynaut · rynaut.github.io/kv/</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const MODELS=[{"id":"Qwen/Qwen3-0.6B","p":0.6,"b":114688},{"id":"Qwen/Qwen2.5-1.5B-Instruct","p":1.54,"b":28672},{"id":"Qwen/Qwen3-1.7B","p":1.7,"b":114688},{"id":"Qwen/Qwen2.5-3B","p":3.0,"b":36864},{"id":"Qwen/Qwen3-4B","p":4.0,"b":147456},{"id":"openbmb/MiniCPM3-4B","p":4.1,"b":35712},{"id":"Qwen/Qwen2.5-7B-Instruct","p":7.0,"b":57344},{"id":"mistralai/Mistral-7B-v0.3","p":7.0,"b":131072},{"id":"Qwen/Qwen3-8B","p":8.0,"b":147456},{"id":"meta-llama/Llama-3.1-8B-Instruct","p":8.03,"b":131072},{"id":"ibm-granite/granite-3.1-8b-base","p":8.0,"b":163840},{"id":"mistralai/Mistral-Nemo-Base-2407","p":12.2,"b":163840},{"id":"Qwen/Qwen3-14B","p":14.0,"b":163840},{"id":"microsoft/phi-4","p":14.7,"b":204800},{"id":"Qwen/Qwen3-30B-A3B","p":30.5,"b":98304},{"id":"Qwen/Qwen2.5-32B","p":32.0,"b":262144}],MEAS={"Qwen/Qwen2.5-1.5B-Instruct":{"4096_f16":["fits",1359],"4096_q8_0":["fits",1307],"32768_f16":["fits",2171],"32768_q8_0":["fits",1751],"131072_f16":["fits",4955],"131072_q8_0":["fits",3275]},"meta-llama/Llama-3.1-8B-Instruct":{"4096_f16":["fits",5202],"4096_q8_0":["fits",4962],"32768_f16":["spills",8814],"32768_q8_0":["spills",6894],"131072_f16":["OOM",4403],"131072_q8_0":["OOM",4403]},"openbmb/MiniCPM3-4B":{"4096_f16":["fits",5617],"4096_q8_0":["fits",4164],"32768_f16":["OOM",2354],"32768_q8_0":["OOM",2354],"131072_f16":["OOM",2354],"131072_q8_0":["OOM",2354]}};
+const VR=[4,6,8,12,16,24],CX=[1024,2048,4096,8192,16384,32768,65536,131072],KP=[["f16",2],["q8_0",1]],WQ=[["Q4",.6],["Q8",1.07],["FP16",2]];
+const S={m:"Qwen/Qwen2.5-1.5B-Instruct",v:6,ci:5,k:"f16",w:"Q4",d:false};
+try{const u=new URLSearchParams(location.search);if(u.get("m")&&MODELS.find(x=>x.id===u.get("m")))S.m=u.get("m");if(u.get("v"))S.v=+u.get("v");if(u.get("c")){const i=CX.indexOf(+u.get("c"));if(i>=0)S.ci=i}if(u.get("k"))S.k=u.get("k");if(u.get("w"))S.w=u.get("w")}catch(e){}
+const GiB=2**30,RM=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $=id=>document.getElementById(id);
+const fmtG=b=>(b/GiB).toFixed(b<GiB?2:1)+" GiB",fmtT=n=>n>=1024?(n/1024)+"K":String(n);
+function calc(){const r=MODELS.find(x=>x.id===S.m),c=CX[S.ci],kvB=KP.find(x=>x[0]==S.k)[1]/2,wB=WQ.find(x=>x[0]==S.w)[1];
+ const weights=r.p*1e9*wB,kv=r.b*kvB*c,usable=(S.v-.3-(S.d?1:0))*GiB,total=weights+kv;
+ const st=total>usable?"no":total>usable*.9?"tight":"fits";const free=usable-weights;const maxTok=free>0?Math.floor(free/(r.b*kvB)):0;
+ let meas=null;if(S.v===6&&S.w==="Q4"&&MEAS[r.id])meas=MEAS[r.id][c+"_"+S.k]||null;
+ return{r,c,weights,kv,usable,total,st,maxTok,meas}}
+function rail(id,list,key,fmt){const el=$(id);el.innerHTML="";list.forEach(x=>{const val=Array.isArray(x)?x[0]:x;const b=document.createElement("button");b.type="button";b.textContent=fmt(x);b.setAttribute("aria-pressed",S[key]==val);b.onclick=()=>{S[key]=val;update()};el.appendChild(b)})}
+const sel=$("model");MODELS.forEach(r=>{const o=document.createElement("option");o.value=r.id;o.textContent=r.id.split("/")[1]+" · "+r.p+"B"+(MEAS[r.id]?" · measured":"");sel.appendChild(o)});
+sel.onchange=()=>{S.m=sel.value;update()};$("ctx").oninput=e=>{S.ci=+e.target.value;update()};
+function sw(id,get,set){const b=$(id);const sync=()=>b.setAttribute("aria-checked",get());b.onclick=()=>{set(!get());sync()};sync()}
+sw("desk",()=>S.d,v=>{S.d=v;update()});
+const isDark=()=>{const r=document.documentElement;return r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches};
+try{const t=localStorage.getItem("mft-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
+sw("theme",isDark,v=>{document.documentElement.dataset.theme=v?"dark":"light";try{localStorage.setItem("mft-theme",document.documentElement.dataset.theme)}catch(e){}paint()});
+const LAB={fits:"Fits",tight:"Tight: under 10% left",no:"Doesn't fit: spills or runs out of memory"},GL={fits:"✓",tight:"≈",no:"✕"};
+function panel(o){$("verdict").className="verdict v-"+o.st;$("verdict").innerHTML=`<span class="gl">${GL[o.st]}</span>${LAB[o.st]}`;
+ $("read").innerHTML=`<span>Weights, ${S.w} (estimate)</span><b>${fmtG(o.weights)}</b><span>KV cache, ${fmtT(o.c)} tokens, ${S.k}</span><b>${fmtG(o.kv)}</b><span>Total</span><b>${fmtG(o.total)}</b><span>Usable on ${S.v} GB</span><b>${fmtG(o.usable)}</b><span>Longest context that fits</span><b>${o.maxTok>0?o.maxTok.toLocaleString()+" tokens":"weights don't fit"}</b>`;
+ const n=$("note");if(o.meas){const mst={fits:"fits",spills:"tight",OOM:"no"}[o.meas[0]];n.style.display="block";n.innerHTML=`<b>Measured on RTX 3050 Laptop 6 GB:</b> ${o.meas[0]} (${o.meas[1].toLocaleString()} MiB device buffers).${mst!==o.st?" <b>The formula and the real run disagree here.</b> This is why we measure.":" The formula agrees."}`}else n.style.display="none"}
+let three=null;
+function update(){rail("vram",VR,"v",v=>v+"G");rail("kvp",KP,"k",k=>k[0]);rail("wq",WQ,"w",w=>w[0]);sel.value=S.m;$("ctx").value=S.ci;$("ctxv").textContent=fmtT(CX[S.ci]);
+ const o=calc();panel(o);if(three)three.set(o);else fallback(o);
+ try{history.replaceState(null,"",`?m=${encodeURIComponent(S.m)}&v=${S.v}&c=${CX[S.ci]}&k=${S.k}&w=${S.w}`)}catch(e){}}
+function fallback(o){const fb=$("fb");fb.style.display="flex";$("hint").style.display="none";const sc=Math.max(o.usable,o.total);
+ const pw=Math.min(o.weights,o.usable)/sc*100,pk=Math.max(0,Math.min(o.kv,o.usable-o.weights))/sc*100,ps=Math.max(0,o.total-o.usable)/sc*100;
+ fb.innerHTML=`<div class="bar"><span style="height:${pw}%;background:color-mix(in srgb,var(--ink) 30%,transparent)"></span><span style="height:${pk}%;background:${o.st==="fits"?"var(--em)":"var(--ink)"}"></span></div><div class="mono" style="text-align:center;font-size:12px;color:var(--mute)">${ps>0?"spilled: "+fmtG(o.total-o.usable):"no spill"} · 3D view needs WebGL</div>`}
+function initThree(){if(!window.THREE)return null;const st=$("stage");let renderer;
+ try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true})}catch(e){return null}if(!renderer.getContext())return null;
+ renderer.setPixelRatio(Math.min(2,devicePixelRatio||1));st.prepend(renderer.domElement);
+ const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(32,1,.1,200);
+ const H=6,W=3,TX=4.6,N=32;let zoom=1,zoomT=1,lookY=2.6,lookT=2.6;const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+ const mBox=new THREE.LineBasicMaterial({}),mRim=new THREE.LineBasicMaterial({}),mTray=new THREE.LineBasicMaterial({});
+ const box=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W,H,W)),mBox);box.position.set(0,H/2,0);scene.add(box);
+ const rimG=new THREE.BufferGeometry().setFromPoints([[-1,-1],[1,-1],[1,1],[-1,1],[-1,-1]].map(([x,z])=>new THREE.Vector3(x*W/2*1.04,H,z*W/2*1.04)));const rim=new THREE.Line(rimG,mRim);scene.add(rim);
+ const tray=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W,1.1,W)),mTray);tray.position.set(TX,.55,0);scene.add(tray);
+ const floorG=new THREE.PlaneGeometry(14,8),mFloor=new THREE.MeshBasicMaterial({transparent:true,opacity:1});const floor=new THREE.Mesh(floorG,mFloor);floor.rotation.x=-Math.PI/2;floor.position.set(2.3,-.002,0);scene.add(floor);
+ const mW=new THREE.MeshBasicMaterial({transparent:true,opacity:.9}),wBlock=new THREE.Mesh(new THREE.BoxGeometry(W*.94,1,W*.94),mW);scene.add(wBlock);
+ const wEdge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W*.94,1,W*.94)),new THREE.LineBasicMaterial({}));scene.add(wEdge);
+ const slabG=new THREE.BoxGeometry(W*.9,1,W*.9),mKV=new THREE.MeshBasicMaterial({}),mSp=new THREE.MeshBasicMaterial({transparent:true,opacity:.55});
+ const kv=new THREE.InstancedMesh(slabG,mKV,N),sp=new THREE.InstancedMesh(slabG,mSp,N);scene.add(kv,sp);
+ const cur=[],tgt=[];for(let i=0;i<N;i++){cur.push({x:0,y:H+4,s:.001,inBox:true});tgt.push({x:0,y:H+4,s:.001,on:false,inBox:true})}
+ let wCur={y:H+3,h:.001},wTgt={y:0,h:1};const dummy=new THREE.Object3D();
+ function paint(){const ink=css("--ink"),em=css("--em"),mute=css("--mute"),panel=css("--panel");mBox.color.set(ink);mRim.color.set(em);mTray.color.set(mute);mFloor.color.set(panel);mW.color.set(mute);wEdge.material.color.set(ink);mSp.color.set(mute);setKV()}
+ let stNow="fits";function setKV(){mKV.color.set(stNow==="fits"?css("--em"):css("--ink"))}
+ function set(o){stNow=o.st;setKV();const upg=H/o.usable;const wH=Math.max(.04,o.weights*upg);wTgt={y:0,h:wH};
+  const n=Math.max(2,Math.min(N,Math.round(o.c/4096)||2)),slabH=o.kv*upg/n;let spillI=0;
+  for(let i=0;i<N;i++){const t=tgt[i];if(i>=n){t.on=false;continue}t.on=true;const y0=wH+i*slabH;
+   if(y0+slabH<=H+1e-6&&wH<=H){t.inBox=true;t.x=0;t.y=y0+slabH/2;t.s=slabH}else{t.inBox=false;t.x=TX;t.y=spillI*slabH+slabH/2;t.s=slabH;spillI++}}
+  const top=Math.max(H,wH,spillI*slabH);zoomT=Math.max(1,top/(H*1.05));lookT=Math.max(2.6,top*.45);
+  if(RM){zoom=zoomT;lookY=lookT;for(let i=0;i<N;i++)Object.assign(cur[i],{x:tgt[i].x,y:tgt[i].y,s:tgt[i].on?tgt[i].s:.001});wCur={...wTgt}}}
+ let theta=-.62,phi=.42,dragging=false,px=0,py=0,touched=false;
+ st.addEventListener("pointerdown",e=>{dragging=true;touched=true;px=e.clientX;py=e.clientY;st.setPointerCapture(e.pointerId);st.style.cursor="grabbing";$("hint").style.opacity=0});
+ st.addEventListener("pointermove",e=>{if(!dragging)return;theta-=(e.clientX-px)*.006;phi=Math.max(.08,Math.min(1.2,phi+(e.clientY-py)*.005));px=e.clientX;py=e.clientY});
+ addEventListener("pointerup",()=>{dragging=false;st.style.cursor="grab"});
+ function size(){const w=st.clientWidth,h=st.clientHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}addEventListener("resize",size);size();
+ let t0=performance.now();
+ function frame(t){const dt=Math.min(.05,(t-t0)/1000);t0=t;const k=RM?1:1-Math.pow(.0015,dt);
+  const th=theta+(touched||RM?0:Math.sin(t/4200)*.22),r=(st.clientWidth<600?24:19)*(zoom+=(zoomT-zoom)*k,zoom);lookY+=(lookT-lookY)*k;cam.position.set(2.3+r*Math.cos(phi)*Math.sin(th),lookY+.4+r*Math.sin(phi),r*Math.cos(phi)*Math.cos(th));cam.lookAt(2.3,lookY,0);
+  wCur.y+=(wTgt.y-wCur.y)*k;wCur.h+=(wTgt.h-wCur.h)*k;wBlock.scale.y=wEdge.scale.y=Math.max(.001,wCur.h);wBlock.position.y=wEdge.position.y=wCur.y+wCur.h/2;
+  let ki=0,si=0;for(let i=0;i<N;i++){const c=cur[i],g=tgt[i];const ts=g.on?g.s:.001;
+   if(c.inBox!==g.inBox&&g.on){c.inBox=g.inBox;if(!g.inBox){c.y=Math.max(c.y,H+.6)}}
+   c.x+=(g.x-c.x)*k;c.y+=((g.on?g.y:H+4)-c.y)*k;c.s+=(ts-c.s)*k;
+   dummy.position.set(c.x,c.y,0);dummy.scale.set(1,Math.max(.001,c.s*.82),1);dummy.updateMatrix();
+   if(g.on&&g.inBox){kv.setMatrixAt(ki++,dummy.matrix)}else if(g.on){sp.setMatrixAt(si++,dummy.matrix)}}
+  kv.count=ki;sp.count=si;kv.instanceMatrix.needsUpdate=sp.instanceMatrix.needsUpdate=true;
+  renderer.render(scene,cam);place(tagT,TX,-.35,W/2);place(tagU,0,H+.9,W/2);place(tagG,0,-.35,W/2);requestAnimationFrame(frame)}
+ function mk(txt){const e=document.createElement("span");e.className="tag";e.textContent=txt;st.appendChild(e);return e}
+ const tagT=mk("shared memory · slow"),tagU=mk("usable VRAM"),tagG=mk("GPU");const pv=new THREE.Vector3();
+ function place(el,x,y,z){pv.set(x,y,z).project(cam);el.style.left=((pv.x+1)/2*st.clientWidth)+"px";el.style.top=((1-pv.y)/2*st.clientHeight)+"px";el.style.transform="translate(-50%,-50%)"}
+ paint();requestAnimationFrame(frame);window.paint=paint;
+ 
+ return{set}}
+window.paint=()=>{};
+three=initThree();update();
+</script></body></html>
