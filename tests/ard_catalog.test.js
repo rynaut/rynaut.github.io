@@ -27,7 +27,7 @@ for (const f of [".well-known/ard.json", ".well-known/ai-catalog.json"]) {
       seen.add(e.identifier);
       assert.ok(e.displayName && e.type, e.identifier);
       assert.strictEqual(["url", "data"].filter((k) => k in e).length, 1, "exactly one of url/data: " + e.identifier);
-      if ("url" in e) assert.match(e.url, /^https:\/\/rynaut\.github\.io\//, e.identifier);
+      if ("url" in e) assert.match(e.url, /^https:\/\/(rynaut\.github\.io|github\.com\/rynaut)\//, e.identifier);
       assert.ok(Array.isArray(e.representativeQueries) && e.representativeQueries.length >= 2 && e.representativeQueries.length <= 5, "2-5 representativeQueries: " + e.identifier);
     }
   });
@@ -43,6 +43,7 @@ test("both paths serve identical content", () => {
 test("every listed URL points at a file or page that exists in this repo", () => {
   const d = JSON.parse(read(".well-known/ard.json"));
   for (const e of d.entries) {
+    if (!e.url || !e.url.startsWith("https://rynaut.github.io/")) continue;
     const rel = e.url.replace("https://rynaut.github.io/", "");
     const p = rel === "" ? "index.html" : rel.endsWith("/") ? rel + "index.html" : rel;
     assert.ok(fs.existsSync(path.join(root, p)), e.identifier + " -> " + p);

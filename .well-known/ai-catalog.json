@@ -81,6 +81,47 @@
         "Rynaut tools index"
       ],
       "tags": ["index"]
+    },
+    {
+      "identifier": "urn:air:rynaut.github.io:tool:kv-fit-table",
+      "displayName": "Model Fit Table (4 to 80 GB GPUs)",
+      "type": "text/html",
+      "url": "https://rynaut.github.io/kv/table/",
+      "description": "Interactive fit, tight and out-of-memory table across 88 open LLMs and 4 to 80 GB GPUs, comparing calculated sizes with 30 measured RTX 3050 6 GB cells.",
+      "representativeQueries": [
+        "which open LLMs fit on a 6GB or 8GB GPU",
+        "KV cache fit table for Qwen Llama and Mistral models",
+        "compare calculated vs measured GPU VRAM usage"
+      ],
+      "capabilities": ["ModelFitTableLookup"],
+      "tags": ["kv-cache", "vram", "gpu-fit", "local-llm"]
+    },
+    {
+      "identifier": "urn:air:rynaut.github.io:tool:kv-vram-box",
+      "displayName": "3D VRAM Box Visualizer",
+      "type": "text/html",
+      "url": "https://rynaut.github.io/kv/box/",
+      "description": "Interactive 3D visualization showing weights, KV cache and overhead stacked against GPU VRAM capacity across context lengths and KV cache precisions.",
+      "representativeQueries": [
+        "visualize weights and KV cache inside GPU VRAM",
+        "3D GPU memory breakdown for LLM inference"
+      ],
+      "capabilities": ["VramBoxVisualizer"],
+      "tags": ["kv-cache", "vram", "visualizer", "3d"]
+    },
+    {
+      "identifier": "urn:air:github.com:rynaut:repo:local-inference-atlas",
+      "displayName": "Local Inference Atlas (GitHub Dataset & Scripts)",
+      "type": "text/html",
+      "url": "https://github.com/rynaut/local-inference-atlas",
+      "description": "Open repository with config.json-derived KV-cache bytes per token for 88 models, 36 measured RTX 3050 6 GB cells, reproduction scripts and tests.",
+      "representativeQueries": [
+        "open dataset of KV cache bytes per token from model config.json",
+        "reproducible llama.cpp 6GB VRAM fit and spill measurements",
+        "prompt caching speedup measurement script for llama-server"
+      ],
+      "capabilities": ["OpenInferenceDataset"],
+      "tags": ["dataset", "kv-cache", "llama.cpp", "open-source"]
     }
   ]
 }
